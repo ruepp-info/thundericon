@@ -126,6 +126,74 @@
         <div id="domainList" class="domains"></div>
         <button type="button" id="addDomain" class="ghost">+ Add mapping</button>
       </section>
+
+      <!-- BIMI brand logos -->
+      <section class="card span2">
+        <h2>Brand logos (BIMI)</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="bimiEnabled" />
+          <span>Show verified brand logos</span>
+        </label>
+        <p class="hint">
+          When a sender's domain publishes a BIMI logo <em>and</em> the message
+          passes DMARC authentication, show the brand logo in place of the
+          initials; everyone else keeps initials. Looking up logos contacts your
+          DNS resolver and the brand's server, so this is off by default.
+        </p>
+
+        <div class="subgroup" id="bimiGroup">
+          <label class="row">
+            <span>Refresh logos every</span>
+            <select id="bimiRefreshHours">
+              <option value="6">6 hours</option>
+              <option value="12">12 hours</option>
+              <option value="24">24 hours (daily)</option>
+              <option value="72">3 days</option>
+              <option value="168">1 week</option>
+            </select>
+          </label>
+          <label class="row">
+            <span>DNS lookup</span>
+            <select id="bimiDohProvider">
+              <option value="cloudflare">Cloudflare DoH</option>
+              <option value="google">Google DoH</option>
+              <option value="custom">Custom DoH endpoint…</option>
+            </select>
+          </label>
+          <div class="row stack conditional" id="bimiCustomGroup" hidden>
+            <span>Custom DoH URL (JSON)</span>
+            <input type="text" id="bimiDohCustomUrl" spellcheck="false"
+                   placeholder="https://resolver.example/dns-query" />
+          </div>
+          <p class="hint">
+            Thunderbird's system resolver can't read the TXT records BIMI needs, so
+            lookups fall back to DNS-over-HTTPS via the chosen provider. The queried
+            sender domain is sent to that provider.
+          </p>
+          <div class="folder-skip">
+            <span class="lbl">Don't look up logos in these folders:</span>
+            <div class="folder-grid">
+              <label class="row switch"><input type="checkbox" id="bimiSkipSent" /><span>Sent</span></label>
+              <label class="row switch"><input type="checkbox" id="bimiSkipDrafts" /><span>Drafts</span></label>
+              <label class="row switch"><input type="checkbox" id="bimiSkipTemplates" /><span>Templates</span></label>
+              <label class="row switch"><input type="checkbox" id="bimiSkipOutbox" /><span>Outbox</span></label>
+              <label class="row switch"><input type="checkbox" id="bimiSkipJunk" /><span>Junk (Spam)</span></label>
+              <label class="row switch"><input type="checkbox" id="bimiSkipTrash" /><span>Trash</span></label>
+            </div>
+          </div>
+          <div class="row">
+            <span>Cached logos</span>
+            <button type="button" id="bimiClear" class="ghost">Clear logo cache</button>
+          </div>
+          <p class="hint">Clearing forces every logo to be re-fetched on next view.</p>
+
+          <div class="row">
+            <span>Troubleshooting</span>
+            <button type="button" id="bimiTest" class="ghost">Test BIMI…</button>
+          </div>
+          <p class="hint">Opens a tool to check whether a given domain publishes a BIMI logo, with a step-by-step log.</p>
+        </div>
+      </section>
     </div>
 
     <footer class="foot">

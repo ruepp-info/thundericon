@@ -1,11 +1,11 @@
 {
   "name": "thundericon",
-  "version": "1.0.6",
+  "version": "1.0.16",
   "private": true,
   "description": "Minimalist sender-initial avatars for the Thunderbird message list.",
   "scripts": {
     "build": "./build.sh",
-    "test": "node --test",
+    "test": "node --test 'test/*.test.js'",
     "package": "python3 tools/package.py",
     "icons": "python3 tools/make-icons.py"
   },

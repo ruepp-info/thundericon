@@ -22,6 +22,16 @@ let state = { settings: {}, domainColors: {} };
 let domainRows = []; // [{ domain, color }]
 let saveTimer = null;
 
+// Folder-skip checkboxes: [checkbox id, settings key].
+const SKIP_FOLDERS = [
+  ["bimiSkipSent", "sent"],
+  ["bimiSkipDrafts", "drafts"],
+  ["bimiSkipTemplates", "templates"],
+  ["bimiSkipOutbox", "outbox"],
+  ["bimiSkipJunk", "junk"],
+  ["bimiSkipTrash", "trash"]
+];
+
 init();
 
 // Show the running add-on version (read from the manifest, so it never drifts).
@@ -72,6 +82,16 @@ function populate() {
   $("colorMode").value = s.colorMode;
   $("fixedColor").value = Core.normalizeHex(s.fixedColor) || "#6b7280";
 
+  $("bimiEnabled").checked = s.bimiEnabled === true;
+  $("bimiRefreshHours").value = String(s.bimiRefreshHours || 24);
+  $("bimiDohProvider").value = s.bimiDohProvider || "cloudflare";
+  $("bimiDohCustomUrl").value = s.bimiDohCustomUrl || "";
+
+  const skip = s.bimiSkipFolders || {};
+  for (const [id, key] of SKIP_FOLDERS) {
+    $(id).checked = skip[key] === true;
+  }
+
   renderPalette();
   renderDomains();
   updateOutputs();
@@ -83,12 +103,18 @@ function wire() {
   const scalars = [
     "enabled", "layoutTable", "layoutCards", "badgeSize", "borderRadius",
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
-    "uppercase", "colorMode", "fixedColor"
+    "uppercase", "colorMode", "fixedColor", "bimiEnabled", "bimiRefreshHours",
+    "bimiDohProvider", "bimiDohCustomUrl"
   ];
   for (const id of scalars) {
     $(id).addEventListener("input", commit);
     $(id).addEventListener("change", commit);
   }
+  for (const [id] of SKIP_FOLDERS) {
+    $(id).addEventListener("change", commit);
+  }
+  $("bimiClear").addEventListener("click", clearBimiCache);
+  $("bimiTest").addEventListener("click", openBimiTest);
   $("addColor").addEventListener("click", () => {
     state.settings.customPalette = (state.settings.customPalette || []).concat("#6e8198");
     renderPalette();
@@ -197,6 +223,45 @@ function collectScalars() {
   s.uppercase = $("uppercase").checked;
   s.colorMode = $("colorMode").value;
   s.fixedColor = $("fixedColor").value;
+  s.bimiEnabled = $("bimiEnabled").checked;
+  s.bimiRefreshHours = parseInt($("bimiRefreshHours").value, 10) || 24;
+  s.bimiDohProvider = $("bimiDohProvider").value;
+  s.bimiDohCustomUrl = $("bimiDohCustomUrl").value.trim();
+  s.bimiSkipFolders = {};
+  for (const [id, key] of SKIP_FOLDERS) {
+    s.bimiSkipFolders[key] = $(id).checked;
+  }
+}
+
+// Open the standalone BIMI test tool in its own window (tab as a fallback).
+async function openBimiTest() {
+  const rt = (typeof messenger !== "undefined" ? messenger : browser);
+  const url = rt.runtime.getURL("options/bimi-test.html");
+  try {
+    await rt.windows.create({ url, type: "popup", width: 680, height: 640 });
+  } catch (e) {
+    try {
+      await rt.tabs.create({ url });
+    } catch (e2) {
+      window.open(url, "_blank");
+    }
+  }
+}
+
+// Ask the background to wipe the persisted + in-memory BIMI logo caches.
+async function clearBimiCache() {
+  const btn = $("bimiClear");
+  btn.disabled = true;
+  try {
+    const rt = (typeof messenger !== "undefined" ? messenger : browser).runtime;
+    await rt.sendMessage({ type: "thundericon:clearBimi" });
+    flashStatus("Logo cache cleared");
+  } catch (e) {
+    flashStatus("Clear failed");
+  } finally {
+    // updateBimiState re-disables it if BIMI is off.
+    updateBimiState();
+  }
 }
 
 function serializeDomains() {
@@ -245,6 +310,7 @@ function sideEffects() {
   $("paletteGroup").hidden = state.settings.colorMode !== "customPalette";
 
   updateEnabledState();
+  updateBimiState();
   applyRootVars();
   renderPreview();
 }
@@ -256,6 +322,23 @@ function updateEnabledState() {
   $("layoutTable").disabled = !on;
   $("layoutCards").disabled = !on;
   $("layoutGroup").classList.toggle("disabled", !on);
+}
+
+// The refresh interval, provider and clear button only matter when BIMI is on.
+// The custom-URL field is shown only for the "custom" provider.
+function updateBimiState() {
+  const on = $("bimiEnabled").checked;
+  $("bimiRefreshHours").disabled = !on;
+  $("bimiDohProvider").disabled = !on;
+  $("bimiClear").disabled = !on;
+  $("bimiGroup").classList.toggle("disabled", !on);
+  for (const [id] of SKIP_FOLDERS) {
+    $(id).disabled = !on;
+  }
+
+  const custom = $("bimiDohProvider").value === "custom";
+  $("bimiCustomGroup").hidden = !custom;
+  $("bimiDohCustomUrl").disabled = !on || !custom;
 }
 
 function applyRootVars() {

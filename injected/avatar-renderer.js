@@ -28,14 +28,34 @@
   const ROW_SELECTOR = 'tr[is="thread-row"], tr[is="thread-card"]';
   const Core = win.ThundericonCore;
 
+  // nsMsgFolderFlags values used to skip BIMI lookups by folder role. Kept as raw
+  // numbers so the renderer needs no privileged Ci access.
+  const FOLDER_FLAGS = {
+    sent: 0x00000200,
+    drafts: 0x00000400,
+    templates: 0x00400000,
+    outbox: 0x00000800,
+    junk: 0x40000000,
+    trash: 0x00000100
+  };
+
   let settings = {};
   let domainColors = {};
   let tbody = null;
   let observer = null;
-  let rowKeys = new WeakMap(); // row element -> last rendered sender key
+  let rowKeys = new WeakMap(); // row element -> last rendered signature
   let pending = new Set(); // rows queued for (re)decoration
   let flushScheduled = false;
   let enabled = true; // gates all decoration; flipped by config
+
+  // BIMI: resolution is async and gated per-message by DMARC (a domain may have a
+  // logo, yet a spoofed message from it must still show initials). So results are
+  // cached by message-id, NOT by domain. Values: string data URL (show logo) or
+  // null (resolved, no logo → initials). The privileged experiment owns the real
+  // DNS/SVG cache; this just avoids re-crossing the bridge for a known message.
+  let bimiEnabled = false;
+  let bimiByMsg = new Map(); // messageId -> dataURL string | null
+  let bimiPendingMsg = new Set(); // messageId currently being resolved
 
   /* ---- tbody discovery -------------------------------------------------- */
 
@@ -200,13 +220,28 @@
       return;
     }
 
-    const author = resolveAuthor(row);
+    const hdr = getMsgHdr(row);
+    const author = authorFrom(hdr, row);
     const desc = Core.describe(author, settings, domainColors);
 
-    if (rowKeys.get(row) === desc.key && existing) {
-      return; // recycled row, same sender, badge intact — nothing to do
+    // BIMI is active for this row unless its folder is excluded (own/untrusted
+    // mail like Sent, Drafts or Junk has no meaningful brand identity).
+    const bimiOn = bimiEnabled && !folderSkipped(hdr);
+
+    // BIMI logo for this specific message, if already resolved.
+    const msgId = hdr && hdr.messageId ? hdr.messageId : "";
+    let logo = null;
+    if (bimiOn && msgId && bimiByMsg.has(msgId)) {
+      logo = bimiByMsg.get(msgId); // string data URL or null
     }
-    rowKeys.set(row, desc.key);
+
+    // Signature folds in whether we render a logo, so an async logo arriving
+    // (initials -> logo) still triggers a re-render on the recycled-row fast path.
+    const sig = desc.key + (logo ? "|L" : "|I");
+    if (rowKeys.get(row) === sig && existing) {
+      return; // recycled row, identical render — nothing to do
+    }
+    rowKeys.set(row, sig);
 
     let badge = existing;
     if (!badge) {
@@ -215,10 +250,99 @@
         "ti-avatar " + (layout === "card" ? "ti-avatar--card" : "ti-avatar--row");
       placeBadge(row, badge, layout);
     }
+    if (logo) {
+      renderLogo(badge, logo, author || desc.initials);
+    } else {
+      renderInitials(badge, desc, author);
+    }
+
+    // Not yet resolved → ask the privileged host (DNS + DMARC + SVG fetch).
+    if (bimiOn && msgId && hdr && !bimiByMsg.has(msgId)) {
+      requestBimi(desc.email, hdr, msgId);
+    }
+  }
+
+  // Should BIMI be skipped for this message because of its folder? Reads the
+  // message folder's flags and matches them against the configured skip set.
+  function folderSkipped(hdr) {
+    let flags = 0;
+    try {
+      if (hdr && hdr.folder) {
+        flags = hdr.folder.flags || 0;
+      }
+    } catch (e) {
+      return false; // can't tell → don't skip
+    }
+    if (!flags) {
+      return false;
+    }
+    const skip = settings.bimiSkipFolders || {};
+    for (const key in FOLDER_FLAGS) {
+      if (skip[key] && (flags & FOLDER_FLAGS[key]) !== 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function renderInitials(badge, desc, author) {
+    badge.classList.remove("ti-avatar--bimi");
+    const img = badge.querySelector("img");
+    if (img) {
+      img.remove();
+    }
     badge.textContent = desc.initials;
     badge.style.setProperty("--ti-color", desc.background);
     badge.style.setProperty("--ti-fg", desc.foreground);
     badge.title = author || desc.initials;
+  }
+
+  function renderLogo(badge, dataUrl, title) {
+    badge.classList.add("ti-avatar--bimi");
+    badge.textContent = "";
+    let img = badge.querySelector("img");
+    if (!img) {
+      img = doc.createElement("img");
+      img.decoding = "async";
+      img.alt = "";
+      badge.appendChild(img);
+    }
+    if (img.getAttribute("src") !== dataUrl) {
+      img.setAttribute("src", dataUrl);
+    }
+    badge.title = title || "";
+  }
+
+  // Ask the privileged experiment to resolve a BIMI logo for this message. The
+  // host enforces the DMARC gate and owns the TTL'd DNS/SVG cache; we just record
+  // the per-message answer and re-scan visible rows when a logo actually arrives.
+  function requestBimi(email, hdr, msgId) {
+    const host = win.__thundericonHost;
+    if (!host || typeof host.resolveBimi !== "function") {
+      return;
+    }
+    const domain = email ? Core.domainOf(email) : "";
+    if (!domain || bimiPendingMsg.has(msgId)) {
+      return;
+    }
+    bimiPendingMsg.add(msgId);
+    try {
+      host.resolveBimi(domain, hdr, (dataUrl) => {
+        bimiPendingMsg.delete(msgId);
+        if (!bimiEnabled) {
+          return; // disabled while in flight
+        }
+        bimiByMsg.set(msgId, dataUrl || null);
+        // Only a positive result changes what is on screen (rows show initials by
+        // default); re-enqueue so the matching row swaps in its logo. Idle-batched
+        // and deduped, so this stays cheap and converges once all are cached.
+        if (dataUrl) {
+          enqueueAllRows();
+        }
+      });
+    } catch (e) {
+      bimiPendingMsg.delete(msgId);
+    }
   }
 
   function findBadge(row) {
@@ -264,20 +388,27 @@
     return -1;
   }
 
-  function resolveAuthor(row) {
-    // Preferred: the real header via the DB view — the only source of the email
-    // address, which domain-to-color mappings need.
+  // The real message header via the DB view — the only source of the email
+  // address (domain→color, BIMI) and message-id (BIMI/DMARC). May be null.
+  function getMsgHdr(row) {
     try {
       const view = win.gDBView;
       const idx = rowIndex(row);
       if (view && idx >= 0) {
-        const hdr = view.getMsgHdrAt(idx);
-        if (hdr) {
-          return hdr.mime2DecodedAuthor || hdr.author || "";
-        }
+        return view.getMsgHdrAt(idx) || null;
       }
     } catch (e) {
-      /* fall through to scraping */
+      /* fall through; caller scrapes the visible text */
+    }
+    return null;
+  }
+
+  function authorFrom(hdr, row) {
+    if (hdr) {
+      const a = hdr.mime2DecodedAuthor || hdr.author || "";
+      if (a) {
+        return a;
+      }
     }
     // Fallback: scrape the visible correspondent text (display name only).
     const cell =
@@ -369,6 +500,13 @@
     rowKeys = new WeakMap();
     enabled = settings.enabled !== false;
 
+    // Re-resolve BIMI on every config push. Cheap (the host keeps a TTL'd DNS/SVG
+    // cache, so usually no network), and it lets the options "Clear" button take
+    // effect: clearing storage + re-pushing config drops these per-message caches.
+    bimiEnabled = settings.bimiEnabled === true;
+    bimiByMsg = new Map();
+    bimiPendingMsg = new Set();
+
     if (!enabled) {
       if (observer) {
         observer.disconnect();
@@ -407,6 +545,8 @@
         }
         rowKeys = new WeakMap();
         pending = new Set();
+        bimiByMsg = new Map();
+        bimiPendingMsg = new Set();
       } catch (e) {
         /* best effort */
       }

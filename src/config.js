@@ -33,10 +33,31 @@
 
       // Initials derivation
       initialsCount: 2, // 1 or 2
-      initialsSource: "displayName" // displayName | email
+      initialsSource: "displayName", // displayName | email
+
+      // BIMI (Brand Indicators for Message Identification) — opt-in.
+      bimiEnabled: false,
+      bimiRefreshHours: 24,
+      // TXT lookups use Thunderbird's resolver first, then DNS-over-HTTPS (the
+      // OS resolver can't do TXT). Which DoH provider to use for that fallback:
+      bimiDohProvider: "cloudflare", // cloudflare | google | custom
+      bimiDohCustomUrl: "", // JSON DoH endpoint, used when provider = custom
+
+      // Folder types to skip BIMI lookups in (own/untrusted mail). Keyed by
+      // folder role; matched against the message folder's flags in the renderer.
+      bimiSkipFolders: {
+        sent: true,
+        drafts: true,
+        templates: true,
+        outbox: true,
+        junk: true,
+        trash: false
+      }
     },
     // domain -> hex override map, e.g. { "example.com": "#8a9a5b" }
-    domainColors: {}
+    domainColors: {},
+    // domain -> { status:"ok"|"none", logo:<dataURL>|null, ts:<epoch ms> }
+    bimiCache: {}
   };
 
   function deepClone(obj) {
@@ -54,9 +75,19 @@
           stored.settings.layouts
         );
       }
+      if (stored.settings.bimiSkipFolders) {
+        out.settings.bimiSkipFolders = Object.assign(
+          {},
+          DEFAULTS.settings.bimiSkipFolders,
+          stored.settings.bimiSkipFolders
+        );
+      }
     }
     if (stored && stored.domainColors && typeof stored.domainColors === "object") {
       out.domainColors = deepClone(stored.domainColors);
+    }
+    if (stored && stored.bimiCache && typeof stored.bimiCache === "object") {
+      out.bimiCache = deepClone(stored.bimiCache);
     }
     return out;
   }
@@ -66,7 +97,7 @@
     if (!api || !api.storage) {
       return deepClone(DEFAULTS);
     }
-    const stored = await api.storage.local.get(["settings", "domainColors"]);
+    const stored = await api.storage.local.get(["settings", "domainColors", "bimiCache"]);
     return mergeSettings(stored);
   }
 

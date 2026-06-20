@@ -36,6 +36,31 @@
         "description": "Disconnect observers and remove all injected avatars and styles.",
         "async": true,
         "parameters": []
+      },
+      {
+        "name": "seedBimiCache",
+        "type": "function",
+        "description": "Seed/replace the in-memory BIMI logo cache from persisted storage (JSON string of domain -> entry).",
+        "async": true,
+        "parameters": [
+          {
+            "name": "cacheJson",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "testBimi",
+        "type": "function",
+        "description": "Diagnostic: resolve a domain's BIMI logo (DNS + SVG, no DMARC gate) and return a step-by-step log plus the logo data URL.",
+        "async": true,
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "description": "An email address or bare domain to test."
+          }
+        ]
       }
     ],
     "events": [
@@ -46,6 +71,21 @@
         "parameters": [
           {
             "name": "message",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "onBimiResolved",
+        "type": "function",
+        "description": "Fired when a domain's BIMI logo is resolved, so it can be persisted.",
+        "parameters": [
+          {
+            "name": "domain",
+            "type": "string"
+          },
+          {
+            "name": "entryJson",
             "type": "string"
           }
         ]

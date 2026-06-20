@@ -129,6 +129,20 @@ body {
   opacity: 0.45;
 }
 
+.folder-skip {
+  margin: 10px 0 4px;
+}
+
+.folder-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 16px;
+}
+
+.folder-grid .row.switch {
+  margin: 0;
+}
+
 input[type="text"],
 select {
   width: 100%;

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thundericon — BIMI Test</title>
+  <link rel="stylesheet" href="../injected/avatars.css" />
+  <link rel="stylesheet" href="options.css" />
+  <link rel="stylesheet" href="bimi-test.css" />
+</head>
+<body class="bimi-test">
+  <main class="wrap">
+    <header class="head">
+      <h1>BIMI Test</h1>
+      <p class="sub">
+        Check whether a domain publishes a usable BIMI logo. This runs the real
+        DNS&nbsp;+&nbsp;logo-fetch path but skips the DMARC check (there is no
+        specific message here) — in the message list a logo additionally requires
+        the message to pass DMARC.
+      </p>
+    </header>
+
+    <section class="card">
+      <form id="form" class="test-form">
+        <input
+          type="text"
+          id="query"
+          placeholder="name@example.com  or  example.com"
+          spellcheck="false"
+          autocomplete="off"
+          autofocus
+        />
+        <button type="submit" id="run">Check</button>
+      </form>
+
+      <div class="result" id="result" hidden>
+        <span class="ti-avatar ti-avatar--row ti-avatar--bimi" id="logoBadge"></span>
+        <div class="result-text">
+          <div class="verdict" id="verdict"></div>
+          <div class="meta" id="meta"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Log</h2>
+      <pre id="log" class="log" aria-live="polite">Enter a domain or email address and press “Check”.</pre>
+    </section>
+  </main>
+
+  <script src="bimi-test.js"></script>
+</body>
+</html>

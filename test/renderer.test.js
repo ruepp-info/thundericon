@@ -43,16 +43,23 @@ function setup() {
   doc.body.appendChild(table);
 
   const authors = [];
+  const folderFlags = [];
   window.gDBView = {
     getMsgHdrAt(i) {
-      return authors[i] != null ? { mime2DecodedAuthor: authors[i] } : null;
+      return authors[i] != null
+        ? {
+            mime2DecodedAuthor: authors[i],
+            messageId: "msg-" + i + "@test",
+            folder: { flags: folderFlags[i] || 0 }
+          }
+        : null;
     }
   };
 
   window.eval(CORE);
   window.eval(RENDERER);
 
-  return { window, doc, tbody, authors };
+  return { window, doc, tbody, authors, folderFlags };
 }
 
 function addRow(doc, { index, kind = "row", text = "loading" }) {
@@ -255,6 +262,161 @@ test("disabling via config removes all badges; re-enabling restores them", async
   window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
   await waitFor(() => badges(tbody).length === 1);
   assert.equal(badges(tbody).length, 1, "restored when re-enabled");
+});
+
+/* ---- BIMI logo branch ------------------------------------------------- */
+
+function bimiConfig() {
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.bimiEnabled = true;
+  cfg.settings.bimiRefreshHours = 24;
+  return cfg;
+}
+
+test("renders a BIMI logo image when the host resolves one, initials otherwise", async () => {
+  const { window, doc, tbody, authors } = setup();
+  const LOGO = "data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C/svg%3E";
+  window.__thundericonHost = {
+    resolveBimi(domain, hdr, cb) {
+      cb(domain === "brand.com" ? LOGO : null);
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(bimiConfig()));
+
+  authors[0] = "Brand Co <hello@brand.com>";
+  authors[1] = "Plain Person <p@plain.org>";
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  tbody.appendChild(addRow(doc, { index: 1 }));
+
+  await waitFor(() => tbody.querySelector(".ti-avatar--bimi img"));
+  await settle();
+
+  const rows = [...tbody.querySelectorAll('tr[is="thread-row"]')];
+  const logoBadge = rows[0].querySelector(".ti-avatar");
+  assert.ok(logoBadge.classList.contains("ti-avatar--bimi"));
+  const img = logoBadge.querySelector("img");
+  assert.ok(img, "logo row has an <img>");
+  assert.equal(img.getAttribute("src"), LOGO);
+  assert.equal(logoBadge.textContent, "", "initials text cleared under the logo");
+  assert.equal(rows[0].querySelectorAll(".ti-avatar").length, 1);
+
+  const plainBadge = rows[1].querySelector(".ti-avatar");
+  assert.equal(plainBadge.querySelector("img"), null);
+  assert.equal(plainBadge.textContent, "PP");
+  assert.ok(!plainBadge.classList.contains("ti-avatar--bimi"));
+});
+
+test("DMARC gate is per-message: a spoofed message keeps initials though the domain has a logo", async () => {
+  const { window, doc, tbody, authors } = setup();
+  const LOGO = "data:image/svg+xml,logo";
+  window.__thundericonHost = {
+    resolveBimi(domain, hdr, cb) {
+      // Same domain for both, but only the authenticated message gets the logo.
+      cb(hdr.messageId === "msg-0@test" ? LOGO : null);
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(bimiConfig()));
+
+  authors[0] = "Real Brand <hi@brand.com>"; // passes the gate
+  authors[1] = "Spoofed Brand <hi@brand.com>"; // fails -> initials
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  tbody.appendChild(addRow(doc, { index: 1 }));
+
+  await waitFor(() => tbody.querySelector(".ti-avatar--bimi img"));
+  await settle();
+
+  const rows = [...tbody.querySelectorAll('tr[is="thread-row"]')];
+  assert.ok(rows[0].querySelector("img"), "authenticated message shows the logo");
+  assert.equal(rows[1].querySelector("img"), null, "spoofed message shows initials");
+  assert.ok(!rows[1].querySelector(".ti-avatar").classList.contains("ti-avatar--bimi"));
+});
+
+test("does not consult the host when BIMI is disabled", async () => {
+  const { window, doc, tbody, authors } = setup();
+  let calls = 0;
+  window.__thundericonHost = {
+    resolveBimi() {
+      calls++;
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG)); // bimiEnabled absent => off
+
+  authors[0] = "Brand Co <hello@brand.com>";
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  await waitFor(() => tbody.querySelector(".ti-avatar"));
+  await settle();
+
+  assert.equal(calls, 0, "host never called while BIMI is off");
+  assert.equal(tbody.querySelector(".ti-avatar").textContent, "BC");
+});
+
+test("disabling BIMI reverts a shown logo back to initials", async () => {
+  const { window, doc, tbody, authors } = setup();
+  window.__thundericonHost = {
+    resolveBimi(domain, hdr, cb) {
+      cb("data:image/svg+xml,logo");
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(bimiConfig()));
+
+  authors[0] = "Brand Co <hello@brand.com>";
+  const row = addRow(doc, { index: 0 });
+  tbody.appendChild(row);
+  await waitFor(() => row.querySelector(".ti-avatar--bimi img"));
+
+  const off = bimiConfig();
+  off.settings.bimiEnabled = false;
+  window.__thundericon.apply(JSON.stringify(off));
+
+  await waitFor(() => {
+    const b = row.querySelector(".ti-avatar");
+    return b && !b.classList.contains("ti-avatar--bimi") && b.textContent === "BC";
+  });
+  assert.equal(row.querySelector("img"), null, "logo <img> removed");
+  assert.equal(row.querySelectorAll(".ti-avatar").length, 1);
+});
+
+test("skips BIMI lookups in excluded folders (Sent) and keeps initials", async () => {
+  const { window, doc, tbody, authors, folderFlags } = setup();
+  let calls = 0;
+  window.__thundericonHost = {
+    resolveBimi(domain, hdr, cb) {
+      calls++;
+      cb("data:image/svg+xml,logo");
+    }
+  };
+  const cfg = bimiConfig();
+  cfg.settings.bimiSkipFolders = { sent: true };
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  authors[0] = "Brand Co <hello@brand.com>";
+  folderFlags[0] = 0x00000200; // nsMsgFolderFlags.SentMail
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  await waitFor(() => tbody.querySelector(".ti-avatar"));
+  await settle();
+
+  assert.equal(calls, 0, "host never consulted for an excluded folder");
+  const badge = tbody.querySelector(".ti-avatar");
+  assert.equal(badge.querySelector("img"), null);
+  assert.equal(badge.textContent, "BC");
+});
+
+test("still resolves BIMI in a non-excluded folder (Inbox)", async () => {
+  const { window, doc, tbody, authors, folderFlags } = setup();
+  window.__thundericonHost = {
+    resolveBimi(domain, hdr, cb) {
+      cb("data:image/svg+xml,logo");
+    }
+  };
+  const cfg = bimiConfig();
+  cfg.settings.bimiSkipFolders = { sent: true, drafts: true, junk: true };
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  authors[0] = "Brand Co <hello@brand.com>";
+  folderFlags[0] = 0x00001000; // nsMsgFolderFlags.Inbox — not excluded
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  await waitFor(() => tbody.querySelector(".ti-avatar--bimi img"));
+  assert.ok(tbody.querySelector(".ti-avatar--bimi img"));
 });
 
 test("destroy() removes every badge and clears root variables", async () => {

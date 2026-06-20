@@ -1,0 +1,99 @@
+/* Thundericon — BIMI test window. Builds on options.css (tokens, .wrap, .card). */
+
+.bimi-test .wrap {
+  max-width: 620px;
+}
+
+.test-form {
+  display: flex;
+  gap: 8px;
+}
+
+.test-form input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.test-form button {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.test-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* Render the found logo at a comfortable preview size using the shared badge. */
+.bimi-test #logoBadge {
+  --ti-size: 56px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--bg);
+}
+
+.result-text {
+  min-width: 0;
+}
+
+.verdict {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.verdict.ok {
+  color: #2e7d32;
+}
+
+.verdict.bad {
+  color: var(--danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  .verdict.ok {
+    color: #7bc47f;
+  }
+}
+
+.meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.log {
+  margin: 0;
+  padding: 12px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 12px/1.5 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

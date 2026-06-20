@@ -36,8 +36,21 @@
   -moz-user-select: none;
 }
 
-/* Table view: compact inline badge in the correspondent/sender cell. */
-.ti-avatar--row {
+/* Table view: compact inline badge in the correspondent/sender cell.
+ *
+ * Use a two-class selector (higher specificity) and re-assert centering so
+ * Thunderbird's cell styles can't push the initials to the edge, and switch
+ * overflow to visible so two-character initials are never clipped. */
+.ti-avatar.ti-avatar--row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  direction: ltr;
+  flex: 0 0 auto;
+  overflow: visible;
+  letter-spacing: 0;
+  padding: 0;
   vertical-align: middle;
 }
 
@@ -66,4 +79,22 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   top: 50%;
   transform: translateY(-50%);
   margin: 0;
+}
+
+/* BIMI: a verified brand logo replaces the initials. The badge keeps its size
+ * and border-radius (so a circular badge clips the logo to a circle); the
+ * colored fill and glyph styling give way to the image. Two-class selector so
+ * it overrides .ti-avatar's fill and .ti-avatar--row's `overflow: visible`
+ * (defined earlier with the same specificity). */
+.ti-avatar.ti-avatar--bimi {
+  background-color: transparent;
+  overflow: hidden;
+  letter-spacing: 0;
+}
+
+.ti-avatar--bimi img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }

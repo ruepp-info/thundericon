@@ -227,12 +227,12 @@
 
   function placeBadge(row, badge, layout) {
     if (layout === "card") {
-      const container =
-        row.querySelector(".card-layout") ||
-        row.querySelector("td > div") ||
-        row.querySelector("td") ||
-        row;
-      container.prepend(badge);
+      // Put the badge in the card's table cell as a *sibling* of the card
+      // content (not inside .card-layout's grid), so CSS can lay the cell out as
+      // [ avatar | existing 2-line card ] without disturbing the card.
+      const content = row.querySelector(".card-layout");
+      const cell = (content && content.closest("td")) || row.querySelector("td") || row;
+      cell.prepend(badge);
       return;
     }
     const cell =

@@ -195,7 +195,7 @@ test("respects disabled card layout but still decorates table rows", async () =>
   assert.equal(row.querySelectorAll(".ti-avatar").length, 1, "row decorated");
 });
 
-test("card rows place the badge inside the card layout", async () => {
+test("card rows place the badge in the cell, beside (not inside) the card content", async () => {
   const { window, doc, tbody, authors } = setup();
   window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
 
@@ -203,10 +203,14 @@ test("card rows place the badge inside the card layout", async () => {
   const card = addRow(doc, { index: 0, kind: "card" });
   tbody.appendChild(card);
 
-  await waitFor(() => card.querySelector(".card-layout .ti-avatar"));
+  await waitFor(() => card.querySelector(".ti-avatar"));
   const badge = card.querySelector(".ti-avatar");
   assert.ok(badge.classList.contains("ti-avatar--card"));
   assert.equal(badge.textContent, "CV");
+  // Sibling of .card-layout inside the same <td>, inserted first.
+  assert.equal(badge.parentElement.tagName, "TD");
+  assert.equal(badge.parentElement.firstElementChild, badge);
+  assert.ok(badge.nextElementSibling.classList.contains("card-layout"));
 });
 
 test("applies geometry through root CSS variables", async () => {

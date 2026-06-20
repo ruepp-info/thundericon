@@ -24,7 +24,21 @@ let saveTimer = null;
 
 init();
 
+// Show the running add-on version (read from the manifest, so it never drifts).
+function showVersion() {
+  try {
+    const rt = (typeof messenger !== "undefined" ? messenger : browser).runtime;
+    const el = $("version");
+    if (el) {
+      el.textContent = "v" + rt.getManifest().version;
+    }
+  } catch (e) {
+    /* runtime unavailable (e.g. opened outside Thunderbird) */
+  }
+}
+
 async function init() {
+  showVersion();
   const cfg = await Cfg.load();
   state.settings = cfg.settings;
   state.domainColors = cfg.domainColors;

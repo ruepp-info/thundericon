@@ -41,10 +41,29 @@
   vertical-align: middle;
 }
 
-/* Cards view: larger badge floated to the left so the text wraps beside it. */
+/* Cards view: a tall avatar on the left, the normal 2-line card to its right.
+ *
+ * Thunderbird's .card-layout is a CSS grid with named areas (sender/subject/
+ * icons); changing the cell's display (e.g. to flex) breaks the card's sizing.
+ * So we leave the cell as-is and only:
+ *   1. give the cell a positioning context,
+ *   2. indent the card content to reserve a column on the left,
+ *   3. absolutely overlay the avatar, vertically centered, in that column.
+ * This never restructures the card — worst case the avatar is mispositioned but
+ * the sender/subject lines still render normally. */
+tr[is="thread-card"] td:has(> .ti-avatar--card) {
+  position: relative;
+}
+
+tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
+  margin-inline-start: calc(var(--ti-size, 24px) * 1.7 + 16px);
+}
+
 .ti-avatar--card {
-  --_ti-size: calc(var(--ti-size, 24px) * 1.6);
-  float: inline-start;
-  margin-block-start: 1px;
-  margin-inline-end: 8px;
+  --_ti-size: calc(var(--ti-size, 24px) * 1.7);
+  position: absolute;
+  inset-inline-start: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
 }

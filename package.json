@@ -1,6 +1,6 @@
 {
   "name": "thundericon",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "private": true,
   "description": "Minimalist sender-initial avatars for the Thunderbird message list.",
   "scripts": {

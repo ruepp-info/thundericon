@@ -1,0 +1,50 @@
+/* Thundericon — message list avatar badges.
+ *
+ * All geometry/typography comes from CSS custom properties set once on the
+ * document root by the renderer (--ti-size, --ti-radius, --ti-font, ...).
+ * Only the per-sender color (--ti-color / --ti-fg) is set on each badge.
+ */
+
+.ti-avatar {
+  --_ti-size: var(--ti-size, 24px);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+
+  width: var(--_ti-size);
+  height: var(--_ti-size);
+  border-radius: var(--ti-radius, 50%);
+
+  background-color: var(--ti-color, #6b7280);
+  color: var(--ti-fg, #ffffff);
+
+  font-family: var(--ti-font, system-ui, sans-serif);
+  font-weight: var(--ti-weight, 600);
+  font-size: calc(var(--_ti-size) * var(--ti-fontscale, 0.42));
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: var(--ti-transform, uppercase);
+
+  vertical-align: middle;
+  margin-inline-end: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+  -moz-user-select: none;
+}
+
+/* Table view: compact inline badge in the correspondent/sender cell. */
+.ti-avatar--row {
+  vertical-align: middle;
+}
+
+/* Cards view: larger badge floated to the left so the text wraps beside it. */
+.ti-avatar--card {
+  --_ti-size: calc(var(--ti-size, 24px) * 1.6);
+  float: inline-start;
+  margin-block-start: 1px;
+  margin-inline-end: 8px;
+}

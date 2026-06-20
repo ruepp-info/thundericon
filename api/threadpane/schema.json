@@ -1,0 +1,55 @@
+[
+  {
+    "namespace": "threadPaneAvatars",
+    "description": "Privileged bridge that injects sender-initial avatars into the about:3pane message list.",
+    "functions": [
+      {
+        "name": "start",
+        "type": "function",
+        "description": "Begin observing all mail windows and inject avatars using the given config.",
+        "async": true,
+        "parameters": [
+          {
+            "name": "config",
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Full Thundericon config: { settings, domainColors }."
+          }
+        ]
+      },
+      {
+        "name": "updateConfig",
+        "type": "function",
+        "description": "Push updated config to every injected message list (no restart).",
+        "async": true,
+        "parameters": [
+          {
+            "name": "config",
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      },
+      {
+        "name": "stop",
+        "type": "function",
+        "description": "Disconnect observers and remove all injected avatars and styles.",
+        "async": true,
+        "parameters": []
+      }
+    ],
+    "events": [
+      {
+        "name": "onError",
+        "type": "function",
+        "description": "Fired when injection encounters a recoverable error.",
+        "parameters": [
+          {
+            "name": "message",
+            "type": "string"
+          }
+        ]
+      }
+    ]
+  }
+]

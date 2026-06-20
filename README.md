@@ -1,0 +1,115 @@
+# Thundericon
+
+Minimalist **sender-initial avatars** for the Thunderbird message list. A circular
+badge with the sender's initials is injected into every row of the thread tree —
+in both **Table** and **Cards** layouts — without blocking the main thread.
+
+![icon](icons/icon-64.png)
+
+## Features
+
+- **Non-blocking injection.** A single `MutationObserver` watches the virtualized
+  thread tbody; mutations are coalesced and processed in **idle, time-sliced
+  batches**. Rows are recycled as you scroll, so each row's last sender is cached
+  and unchanged rows are skipped — decoration is idempotent.
+- **Both list layouts.** Compact inline badge in Table view; larger left-floated
+  badge in Cards view.
+- **Configurable color logic:** muted neutral palette (default), grayscale, soft
+  low-saturation hue, vibrant HSL hash, a single fixed color, or your own custom
+  palette. Per-sender colors are stable across sessions (deterministic hash).
+- **Domain → color overrides.** Pin a color for everyone at `example.com`.
+- **Typography & geometry.** Font family, weight, uppercase, initials length
+  (1–2) and source (display name / email), badge size, and corner radius
+  (0–50%, where 50% = circle).
+- All preferences live in `browser.storage.local`; the open list updates **live**,
+  no restart required.
+
+## Architecture
+
+| File | Role |
+| --- | --- |
+| `manifest.json` | MV3, registers the experiment, background, and options. |
+| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane`. Injects the renderer + CSS into each message list, relays config, tears down cleanly. |
+| `injected/avatar-renderer.js` | Runs inside `about:3pane`: observer, idle batching, recycle-aware decoration. |
+| `injected/avatars.css` | Badge styling, driven entirely by CSS custom properties. |
+| `src/avatar-core.js` | Shared, pure logic: initials + color (used by renderer **and** options preview). |
+| `src/config.js` | Defaults + `storage.local` load/save/subscribe. |
+| `background.js` | Loads config, starts the experiment, relays changes. |
+| `options/` | Configuration UI with a live preview. |
+
+> The message list lives in the privileged `about:3pane` document, which ordinary
+> WebExtension content scripts cannot touch — hence the small experiment bridge.
+> It uses internal globals (`gDBView`, thread-tree DOM) that are not stable
+> WebExtension API, so the add-on pins `strict_min_version: 141` and falls back to
+> scraping the correspondent cell if the DB view is unavailable.
+
+## Build
+
+One command validates the manifest, generates icons if missing, and produces an
+installable archive:
+
+```sh
+./build.sh            # -> dist/thundericon-<version>.xpi
+./build.sh --test     # run the test suite first
+./build.sh --clean    # wipe dist/ before building
+./build.sh --icons    # force-regenerate the PNG icons
+```
+
+`build.sh` aborts (non-zero) if the manifest is invalid or references a missing
+file, so it never emits a broken add-on. Lower-level helpers remain available:
+`python3 tools/package.py` (validate + zip) and `python3 tools/make-icons.py`.
+
+## Install
+
+> [!IMPORTANT]
+> Thundericon is an **experiment** add-on (it needs privileged access to the
+> message list). **Release Thunderbird disables any unsigned add-on installed
+> permanently** — so installing the `.xpi` via *Add-ons and Themes* leaves it
+> **disabled**: grayed-out Options button, no options dialog, no avatars. Use the
+> temporary-load method below, which runs unsigned add-ons fine.
+
+- **Temporary load (use this for development).** Thunderbird → **Tools → Developer
+  Tools → Debug Add-ons** (`about:debugging`) → **This Thunderbird** → **Load
+  Temporary Add-on…** → pick **`manifest.json`** (not the `.xpi`). Grant the single
+  "full, unrestricted access" permission. It loads **enabled**, so the Options
+  button works immediately. Cleared on restart; re-pick `manifest.json` to reload
+  (also hot-reloads edits — no rebuild needed).
+- **Permanent install** requires signing — there is no way around it on release
+  Thunderbird:
+  - submit the `.xpi` to [addons.thunderbird.net](https://addons.thunderbird.net)
+    for (self-)distribution signing, **or**
+  - run Thunderbird **Beta/Daily/Developer** and set
+    `xpinstall.signatures.required = false` in the Config Editor, then
+    Add-ons Manager → gear ⚙ → **Install Add-on From File…** → `dist/*.xpi`.
+
+If a temporary load still shows a grayed Options button, check that
+`extensions.experiments.enabled` is `true` in the Config Editor.
+
+## Tests
+
+```sh
+npm install   # dev-only: jsdom for the renderer harness
+npm test      # node --test  (26 tests)
+```
+
+- `test/avatar-core.test.js` — pure logic: parsing, initials, all color modes,
+  domain overrides, contrast, hex normalization.
+- `test/config.test.js` — defaults, `storage.local` round-trip + merge, change
+  subscription (storage mocked).
+- `test/renderer.test.js` — drives `avatar-renderer.js` against a **jsdom**
+  `about:3pane`: badge rendering, **no duplicates**, **virtualized-row recycling**,
+  idempotency, layout toggles, the `gDBView` scraping fallback, enable/disable,
+  and clean `destroy()`.
+
+> These cover the pure modules and ~the whole renderer. The privileged experiment
+> bridge (`api/threadpane/`) and true end-to-end still require a live Thunderbird
+> (the manual steps below).
+
+## Verify (in Thunderbird)
+
+- Open a folder → badges appear on every row (Table view). Switch the list header
+  to **Cards** view → larger left-aligned badges.
+- Scroll a large folder fast → no jank, no duplicate/stale badges.
+- **Options** → change color mode / font / size / radius, add a `domain → color`
+  mapping → the open list updates without restart.
+- Disable the add-on → all badges and injected styles are removed cleanly.

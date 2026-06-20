@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Thundericon",
+    "description": "Name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Minimalist sender-initial avatars for the Thunderbird message list, with customizable colors, fonts, and badge shape.",
+    "description": "Description of the extension."
+  }
+}

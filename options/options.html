@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thundericon — Options</title>
+  <link rel="stylesheet" href="../injected/avatars.css" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <h1>Thundericon</h1>
+      <p class="sub">Minimalist sender avatars for your message list.</p>
+    </header>
+
+    <!-- Live preview -->
+    <section class="card">
+      <h2>Preview</h2>
+      <ul id="preview" class="preview"></ul>
+    </section>
+
+    <div class="grid">
+      <!-- General -->
+      <section class="card">
+        <h2>General</h2>
+        <label class="row switch">
+          <input type="checkbox" id="enabled" />
+          <span>Show avatars</span>
+        </label>
+        <label class="row switch">
+          <input type="checkbox" id="layoutTable" />
+          <span>Table view</span>
+        </label>
+        <label class="row switch">
+          <input type="checkbox" id="layoutCards" />
+          <span>Cards view</span>
+        </label>
+      </section>
+
+      <!-- Geometry -->
+      <section class="card">
+        <h2>Badge</h2>
+        <label class="row">
+          <span>Size <output id="badgeSizeOut"></output></span>
+          <input type="range" id="badgeSize" min="14" max="48" step="1" />
+        </label>
+        <label class="row">
+          <span>Corner radius <output id="borderRadiusOut"></output></span>
+          <input type="range" id="borderRadius" min="0" max="50" step="1" />
+        </label>
+      </section>
+
+      <!-- Typography -->
+      <section class="card">
+        <h2>Initials &amp; font</h2>
+        <label class="row stack">
+          <span>Font family</span>
+          <input type="text" id="fontFamily" spellcheck="false" />
+        </label>
+        <label class="row">
+          <span>Weight</span>
+          <select id="fontWeight">
+            <option value="400">Regular</option>
+            <option value="500">Medium</option>
+            <option value="600">Semibold</option>
+            <option value="700">Bold</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Initials length</span>
+          <select id="initialsCount">
+            <option value="1">1 letter</option>
+            <option value="2">2 letters</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Derive from</span>
+          <select id="initialsSource">
+            <option value="displayName">Display name</option>
+            <option value="email">Email address</option>
+          </select>
+        </label>
+        <label class="row switch">
+          <input type="checkbox" id="uppercase" />
+          <span>Uppercase</span>
+        </label>
+      </section>
+
+      <!-- Color -->
+      <section class="card">
+        <h2>Color</h2>
+        <label class="row">
+          <span>Mode</span>
+          <select id="colorMode">
+            <option value="mutedPalette">Muted palette (neutral)</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="lowsatHsl">Soft hue (low saturation)</option>
+            <option value="hslHash">Vibrant hue (HSL hash)</option>
+            <option value="fixed">Fixed color</option>
+            <option value="customPalette">Custom palette</option>
+          </select>
+        </label>
+
+        <div class="row stack conditional" id="fixedGroup" hidden>
+          <span>Fixed color</span>
+          <input type="color" id="fixedColor" />
+        </div>
+
+        <div class="conditional" id="paletteGroup" hidden>
+          <span class="lbl">Custom palette</span>
+          <div id="paletteList" class="chips"></div>
+          <button type="button" id="addColor" class="ghost">+ Add color</button>
+        </div>
+      </section>
+
+      <!-- Domain overrides -->
+      <section class="card span2">
+        <h2>Domain colors</h2>
+        <p class="hint">Force a specific color for senders from a given domain (overrides the mode above).</p>
+        <div id="domainList" class="domains"></div>
+        <button type="button" id="addDomain" class="ghost">+ Add mapping</button>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <button type="button" id="reset" class="ghost danger">Reset to defaults</button>
+      <span id="status" class="status" role="status" aria-live="polite"></span>
+    </footer>
+  </main>
+
+  <!-- Shared, then config, then page logic -->
+  <script src="../src/avatar-core.js"></script>
+  <script src="../src/config.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

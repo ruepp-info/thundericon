@@ -49,17 +49,24 @@ function is3PaneBrowser(browser) {
 
 var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
   getAPI(context) {
-    // Per-instance state.
-    this._config = null;
-    this._cssText = "";
-    this._coreURL = context.extension.getURL("src/avatar-core.js");
-    this._rendererURL = context.extension.getURL("injected/avatar-renderer.js");
-    this._cssURL = context.extension.getURL("injected/avatars.css");
-    this._listenerId = "thundericon-" + context.extension.id;
-    this._mailWindows = new Set(); // messenger windows we have hooked
-    this._renderers = new Set(); // about:3pane content windows we injected into
-    this._winCleanups = new WeakMap(); // window -> cleanup fn
-    this._started = false;
+    // Initialize shared state ONCE. getAPI() runs again every time a context
+    // (re)connects — notably when Thunderbird's MV3 background event page wakes
+    // from suspension. Re-running it would wipe the live renderer registry, so
+    // updateConfig()/broadcast() would push to an empty set and option changes
+    // would only show after a restart. Guard it.
+    if (!this._initialized) {
+      this._initialized = true;
+      this._config = null;
+      this._cssText = "";
+      this._coreURL = context.extension.getURL("src/avatar-core.js");
+      this._rendererURL = context.extension.getURL("injected/avatar-renderer.js");
+      this._cssURL = context.extension.getURL("injected/avatars.css");
+      this._listenerId = "thundericon-" + context.extension.id;
+      this._mailWindows = new Set(); // messenger windows we have hooked
+      this._renderers = new Set(); // about:3pane content windows we injected into
+      this._winCleanups = new WeakMap(); // window -> cleanup fn
+      this._started = false;
+    }
 
     return {
       threadPaneAvatars: {

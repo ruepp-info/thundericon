@@ -244,8 +244,18 @@ function sideEffects() {
   $("fixedGroup").hidden = state.settings.colorMode !== "fixed";
   $("paletteGroup").hidden = state.settings.colorMode !== "customPalette";
 
+  updateEnabledState();
   applyRootVars();
   renderPreview();
+}
+
+// The per-view toggles only matter when the master switch is on, so gray them
+// out (and disable them) while "Show avatars" is off — makes the dependency clear.
+function updateEnabledState() {
+  const on = $("enabled").checked;
+  $("layoutTable").disabled = !on;
+  $("layoutCards").disabled = !on;
+  $("layoutGroup").classList.toggle("disabled", !on);
 }
 
 function applyRootVars() {

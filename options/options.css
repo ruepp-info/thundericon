@@ -109,6 +109,26 @@ body {
   height: 16px;
 }
 
+.row.switch.main span {
+  font-weight: 600;
+}
+
+.subgroup {
+  margin-top: 8px;
+  padding-inline-start: 26px;
+  border-inline-start: 2px solid var(--line);
+}
+
+.subgroup .lbl {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+.subgroup.disabled {
+  opacity: 0.45;
+}
+
 input[type="text"],
 select {
   width: 100%;

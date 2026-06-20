@@ -24,18 +24,23 @@
       <!-- General -->
       <section class="card">
         <h2>General</h2>
-        <label class="row switch">
+        <label class="row switch main">
           <input type="checkbox" id="enabled" />
           <span>Show avatars</span>
         </label>
-        <label class="row switch">
-          <input type="checkbox" id="layoutTable" />
-          <span>Table view</span>
-        </label>
-        <label class="row switch">
-          <input type="checkbox" id="layoutCards" />
-          <span>Cards view</span>
-        </label>
+        <p class="hint">Master switch — turns the whole add-on on or off.</p>
+
+        <div class="subgroup" id="layoutGroup">
+          <span class="lbl">Show avatars in these views:</span>
+          <label class="row switch">
+            <input type="checkbox" id="layoutTable" />
+            <span>Table view</span>
+          </label>
+          <label class="row switch">
+            <input type="checkbox" id="layoutCards" />
+            <span>Cards view</span>
+          </label>
+        </div>
       </section>
 
       <!-- Geometry -->

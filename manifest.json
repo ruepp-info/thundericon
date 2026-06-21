@@ -2,8 +2,9 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
-  "version": "1.0.28",
-  "author": "https://github.com/ruepp-info/thundericon",
+  "version": "0.0.0",
+  "author": "ruepp-info",
+  "homepage_url": "https://github.com/ruepp-info/thundericon",
   "default_locale": "en",
 
   "browser_specific_settings": {

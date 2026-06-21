@@ -277,6 +277,12 @@ output {
   font-size: 12px;
 }
 
+.cache-stats {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .conditional {
   margin-top: 6px;
 }

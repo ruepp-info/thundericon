@@ -60,6 +60,8 @@ async function init() {
   populate();
   wire();
   sideEffects();
+  updateCacheStats();
+  watchCacheStats();
 }
 
 /* ---- populate controls from state ------------------------------------- */
@@ -258,11 +260,65 @@ async function clearBimiCache() {
     const rt = (typeof messenger !== "undefined" ? messenger : browser).runtime;
     await rt.sendMessage({ type: "thundericon:clearBimi" });
     flashStatus("Logo cache cleared");
+    updateCacheStats();
   } catch (e) {
     flashStatus("Clear failed");
   } finally {
     // updateBimiState re-disables it if BIMI is off.
     updateBimiState();
+  }
+}
+
+// Show a small cache-usage summary (entry count, how many hold a logo, and the
+// approximate stored size) next to the Clear button — purely informational.
+async function updateCacheStats() {
+  const el = $("bimiCacheStats");
+  if (!el) {
+    return;
+  }
+  try {
+    const rt = typeof messenger !== "undefined" ? messenger : browser;
+    const stored = await rt.storage.local.get("bimiCache");
+    const cache = (stored && stored.bimiCache) || {};
+    const keys = Object.keys(cache);
+    if (!keys.length) {
+      el.textContent = "(empty)";
+      return;
+    }
+    let logos = 0;
+    for (const k of keys) {
+      if (cache[k] && cache[k].status === "ok") {
+        logos++;
+      }
+    }
+    const bytes = new TextEncoder().encode(JSON.stringify(cache)).length;
+    el.textContent =
+      keys.length + (keys.length === 1 ? " entry" : " entries") +
+      ", " + logos + " with logos · " + formatBytes(bytes);
+  } catch (e) {
+    el.textContent = "";
+  }
+}
+
+function formatBytes(n) {
+  if (n < 1024) {
+    return n + " B";
+  }
+  if (n < 1024 * 1024) {
+    return (n / 1024).toFixed(1) + " KB";
+  }
+  return (n / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+// Refresh the stats live as logos resolve and get persisted in the background.
+function watchCacheStats() {
+  const rt = typeof messenger !== "undefined" ? messenger : browser;
+  if (rt.storage && rt.storage.onChanged) {
+    rt.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes.bimiCache) {
+        updateCacheStats();
+      }
+    });
   }
 }
 

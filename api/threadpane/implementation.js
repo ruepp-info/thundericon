@@ -117,6 +117,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       this._winCleanups = new WeakMap(); // window -> cleanup fn
       this._started = false;
       this._bimiCache = new Map(); // domain -> { status, logo, ts }
+      this._bimiInflight = new Map(); // domain -> Promise (coalesce concurrent lookups)
       this._dmarcCache = new Map(); // messageId -> bool (session only)
       this._bimiLoaded = false;
     }
@@ -533,19 +534,41 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
         this._blog(domain, "→ DMARC not pass → initials");
         return null;
       }
-      // Cached logo (respecting the refresh TTL).
+      // Cached result — a found logo OR a cached "none" (respecting the refresh
+      // TTL). Negative results are cached too, so a sender without BIMI is looked
+      // up once per refresh window rather than once per message.
       const entry = this._bimiCache.get(domain);
       if (entry && Bimi.isFresh(entry.ts, settings.bimiRefreshHours, Date.now())) {
         this._blog(domain, "→ cache hit:", entry.status);
         return entry.status === "ok" ? entry.logo : null;
       }
+      // Cache miss: resolve fresh (coalesced per domain — see _resolveDomainFresh).
+      const fresh = await this._resolveDomainFresh(domain);
+      return fresh.status === "ok" ? fresh.logo : null;
+    } catch (e) {
+      this._blog("resolve error:", e && e.message ? e.message : e);
+      return null;
+    }
+  }
+
+  // Fetch and cache a domain's BIMI status (a found logo OR a "none"), while
+  // de-duplicating concurrent lookups: when a folder full of mail from the same
+  // sender is rendered, every row asks at once — so the first request issues the
+  // single DNS query and the rest await its promise instead of flooding the
+  // resolver. The result is cached (and persisted) for the refresh window.
+  _resolveDomainFresh(domain) {
+    const inflight = this._bimiInflight.get(domain);
+    if (inflight) {
+      return inflight;
+    }
+    const promise = (async () => {
       // Resolve fresh: DNS TXT -> logo URL -> SVG -> data URL.
       const logo = await this._fetchBimiLogo(domain);
       const fresh = logo
         ? { status: "ok", logo, ts: Date.now() }
         : { status: "none", logo: null, ts: Date.now() };
       this._bimiCache.set(domain, fresh);
-      this._blog(domain, "→ resolved:", fresh.status, logo ? "(logo shown)" : "");
+      this._blog(domain, "→ resolved:", fresh.status, logo ? "(logo shown)" : "(no logo)");
       if (this._fireBimi) {
         try {
           this._fireBimi(domain, JSON.stringify(fresh));
@@ -553,11 +576,15 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
           /* no listener */
         }
       }
-      return logo;
-    } catch (e) {
-      this._blog("resolve error:", e && e.message ? e.message : e);
-      return null;
-    }
+      return fresh;
+    })();
+    this._bimiInflight.set(domain, promise);
+    // Clear the in-flight slot once settled so the next refresh can re-resolve.
+    promise.then(
+      () => this._bimiInflight.delete(domain),
+      () => this._bimiInflight.delete(domain)
+    );
+    return promise;
   }
 
   async _fetchBimiLogo(domain) {

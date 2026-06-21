@@ -38,6 +38,10 @@
       // BIMI (Brand Indicators for Message Identification) — opt-in.
       bimiEnabled: false,
       bimiRefreshHours: 24,
+      // Look up the logo on the sender's registrable ("base") domain instead of
+      // the exact From domain, e.g. resolve test@trx.mail2.disneyplus.com against
+      // disneyplus.com. Lets a brand's subdomains share one published logo.
+      bimiBaseDomainOnly: false,
       // TXT lookups use Thunderbird's resolver first, then DNS-over-HTTPS (the
       // OS resolver can't do TXT). Which DoH provider to use for that fallback:
       bimiDohProvider: "cloudflare", // cloudflare | google | custom

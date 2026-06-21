@@ -142,6 +142,17 @@
         </p>
 
         <div class="subgroup" id="bimiGroup">
+          <label class="row switch">
+            <input type="checkbox" id="bimiBaseDomainOnly" />
+            <span>Look up the base domain only</span>
+          </label>
+          <p class="hint">
+            Resolve the logo on the sender's registrable domain instead of the
+            exact sending domain — e.g. a message from
+            <code>test@trx.mail2.disneyplus.com</code> looks up
+            <code>disneyplus.com</code>. Helps brands that send from subdomains
+            but publish BIMI only on their main domain.
+          </p>
           <label class="row">
             <span>Refresh logos every</span>
             <select id="bimiRefreshHours">

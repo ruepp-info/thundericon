@@ -62,6 +62,27 @@ test("a DoH TXT round-trips into parseBimiRecord", () => {
   assert.equal(B.parseBimiRecord(txt).logoUrl, "https://static.ruepp.info/BIMI/sr.svg");
 });
 
+test("baseDomainOf reduces a subdomain to its registrable domain", () => {
+  assert.equal(B.baseDomainOf("trx.mail2.disneyplus.com"), "disneyplus.com");
+  assert.equal(B.baseDomainOf("mail.example.com"), "example.com");
+  assert.equal(B.baseDomainOf("example.com"), "example.com");
+  assert.equal(B.baseDomainOf("a.b.c.d.example.com"), "example.com");
+});
+
+test("baseDomainOf keeps multi-label public suffixes intact", () => {
+  assert.equal(B.baseDomainOf("news.bbc.co.uk"), "bbc.co.uk");
+  assert.equal(B.baseDomainOf("bbc.co.uk"), "bbc.co.uk");
+  assert.equal(B.baseDomainOf("shop.example.com.au"), "example.com.au");
+});
+
+test("baseDomainOf normalizes case, trailing dots and empty input", () => {
+  assert.equal(B.baseDomainOf("MAIL.Example.COM"), "example.com");
+  assert.equal(B.baseDomainOf("mail.example.com."), "example.com");
+  assert.equal(B.baseDomainOf("  example.com  "), "example.com");
+  assert.equal(B.baseDomainOf(""), "");
+  assert.equal(B.baseDomainOf(null), "");
+});
+
 test("isFresh honors the refresh window", () => {
   const now = 1_000_000_000_000;
   assert.equal(B.isFresh(now - 1000, 24, now), true);

@@ -83,6 +83,7 @@ function populate() {
   $("fixedColor").value = Core.normalizeHex(s.fixedColor) || "#6b7280";
 
   $("bimiEnabled").checked = s.bimiEnabled === true;
+  $("bimiBaseDomainOnly").checked = s.bimiBaseDomainOnly === true;
   $("bimiRefreshHours").value = String(s.bimiRefreshHours || 24);
   $("bimiDohProvider").value = s.bimiDohProvider || "cloudflare";
   $("bimiDohCustomUrl").value = s.bimiDohCustomUrl || "";
@@ -103,8 +104,8 @@ function wire() {
   const scalars = [
     "enabled", "layoutTable", "layoutCards", "badgeSize", "borderRadius",
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
-    "uppercase", "colorMode", "fixedColor", "bimiEnabled", "bimiRefreshHours",
-    "bimiDohProvider", "bimiDohCustomUrl"
+    "uppercase", "colorMode", "fixedColor", "bimiEnabled", "bimiBaseDomainOnly",
+    "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl"
   ];
   for (const id of scalars) {
     $(id).addEventListener("input", commit);
@@ -224,6 +225,7 @@ function collectScalars() {
   s.colorMode = $("colorMode").value;
   s.fixedColor = $("fixedColor").value;
   s.bimiEnabled = $("bimiEnabled").checked;
+  s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
   s.bimiRefreshHours = parseInt($("bimiRefreshHours").value, 10) || 24;
   s.bimiDohProvider = $("bimiDohProvider").value;
   s.bimiDohCustomUrl = $("bimiDohCustomUrl").value.trim();
@@ -328,6 +330,7 @@ function updateEnabledState() {
 // The custom-URL field is shown only for the "custom" provider.
 function updateBimiState() {
   const on = $("bimiEnabled").checked;
+  $("bimiBaseDomainOnly").disabled = !on;
   $("bimiRefreshHours").disabled = !on;
   $("bimiDohProvider").disabled = !on;
   $("bimiClear").disabled = !on;

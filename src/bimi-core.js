@@ -79,6 +79,49 @@
     return data.trim();
   }
 
+  // A pragmatic (deliberately NOT exhaustive) set of multi-label public
+  // suffixes, so baseDomainOf("news.bbc.co.uk") → "bbc.co.uk" rather than the
+  // unregistrable "co.uk". The long tail not listed here falls back to the last
+  // two labels, which is correct for the common case this option targets
+  // (e.g. "trx.mail2.disneyplus.com" → "disneyplus.com"). This is not the full
+  // Public Suffix List; bundling that would be overkill for a cosmetic logo.
+  const MULTI_PART_SUFFIXES = new Set([
+    "co.uk", "org.uk", "gov.uk", "ac.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk", "sch.uk",
+    "com.au", "net.au", "org.au", "edu.au", "gov.au", "id.au",
+    "co.nz", "net.nz", "org.nz", "govt.nz", "ac.nz",
+    "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp", "ad.jp",
+    "com.br", "net.br", "org.br", "gov.br",
+    "com.cn", "net.cn", "org.cn", "gov.cn",
+    "co.in", "net.in", "org.in", "gen.in", "firm.in", "ind.in",
+    "co.za", "org.za", "net.za", "gov.za",
+    "co.kr", "or.kr", "co.il", "co.id", "co.th",
+    "com.mx", "com.sg", "com.hk", "com.tr", "com.tw", "com.ar",
+    "com.pl", "com.ua", "com.my"
+  ]);
+
+  /**
+   * Reduce a hostname to its registrable ("base") domain, e.g.
+   * "trx.mail2.disneyplus.com" → "disneyplus.com". Used by the opt-in
+   * base-domain BIMI lookup so a brand's subdomains all resolve to the logo
+   * published on the parent domain. Returns "" for empty/invalid input.
+   */
+  function baseDomainOf(domain) {
+    if (typeof domain !== "string") {
+      return "";
+    }
+    const host = domain.trim().toLowerCase().replace(/\.+$/, "");
+    if (!host) {
+      return "";
+    }
+    const labels = host.split(".");
+    if (labels.length <= 2) {
+      return host;
+    }
+    const lastTwo = labels.slice(-2).join(".");
+    const keep = MULTI_PART_SUFFIXES.has(lastTwo) ? 3 : 2;
+    return labels.slice(-keep).join(".");
+  }
+
   /** Is a cache entry still fresh given a refresh interval in hours? */
   function isFresh(ts, refreshHours, now) {
     if (typeof ts !== "number" || !ts) {
@@ -89,5 +132,5 @@
     return at - ts < hours * 3600 * 1000;
   }
 
-  root.ThundericonBimi = { parseBimiRecord, dmarcPassed, isFresh, txtFromDohData };
+  root.ThundericonBimi = { parseBimiRecord, dmarcPassed, isFresh, txtFromDohData, baseDomainOf };
 })(typeof globalThis !== "undefined" ? globalThis : this);

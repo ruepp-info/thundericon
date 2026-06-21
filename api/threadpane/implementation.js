@@ -382,6 +382,17 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       }
       out("Domain: " + domain);
 
+      // Mirror the live list: when base-domain lookup is on, fold subdomains
+      // into the registrable domain before querying.
+      const settings = (this._config && this._config.settings) || {};
+      if (settings.bimiBaseDomainOnly) {
+        const base = Bimi.baseDomainOf(domain);
+        if (base && base !== domain) {
+          out("Base-domain lookup is on → using: " + base);
+          domain = base;
+        }
+      }
+
       const host = "default._bimi." + domain;
       out("Looking up DNS TXT record: " + host);
       const txt = await this._dnsTxt(host, log);
@@ -440,6 +451,15 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       if (!settings.bimiEnabled || !domain || !Bimi) {
         this._blog("skip:", domain, "enabled=" + !!settings.bimiEnabled, "core=" + !!Bimi);
         return null;
+      }
+      // Optionally fold subdomains into the registrable base domain, so the DNS
+      // lookup, the TTL'd cache and the persisted entry all key off it.
+      if (settings.bimiBaseDomainOnly) {
+        const base = Bimi.baseDomainOf(domain);
+        if (base && base !== domain) {
+          this._blog(domain, "→ base domain:", base);
+          domain = base;
+        }
       }
       // DMARC gate: never show a logo for an unauthenticated message.
       const passed = await this._dmarcPass(msgHdr);

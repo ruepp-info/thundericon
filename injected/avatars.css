@@ -64,6 +64,9 @@
  *   3. absolutely overlay the avatar, vertically centered, in that column.
  * This never restructures the card — worst case the avatar is mispositioned but
  * the sender/subject lines still render normally. */
+/* Key off OUR badge (not Thunderbird-internal classes, whose names/nesting vary):
+ * the cell that contains our card avatar gets a positioning context, and its
+ * card content is indented to reserve the avatar column on the left. */
 tr[is="thread-card"] td:has(> .ti-avatar--card) {
   position: relative;
 }

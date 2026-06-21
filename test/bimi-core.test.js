@@ -83,6 +83,88 @@ test("baseDomainOf normalizes case, trailing dots and empty input", () => {
   assert.equal(B.baseDomainOf(null), "");
 });
 
+test("encodeDnsTxtQuery builds a well-formed TXT question", () => {
+  const q = B.encodeDnsTxtQuery("default._bimi.example.com");
+  // Header: ID=0, flags RD=1 (0x0100), QDCOUNT=1, others 0.
+  assert.deepEqual([...q.slice(0, 12)], [0, 0, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0]);
+  // Question name encoded as length-prefixed labels ending in a root 0.
+  const labels = "default._bimi.example.com".split(".");
+  let p = 12;
+  for (const l of labels) {
+    assert.equal(q[p], l.length);
+    assert.equal(String.fromCharCode(...q.slice(p + 1, p + 1 + l.length)), l);
+    p += 1 + l.length;
+  }
+  assert.equal(q[p++], 0); // root label
+  assert.deepEqual([...q.slice(p, p + 4)], [0x00, 0x10, 0x00, 0x01]); // TXT / IN
+  assert.equal(p + 4, q.length);
+});
+
+test("bytesToBase64Url matches base64url with no padding", () => {
+  const q = B.encodeDnsTxtQuery("default._bimi.example.com");
+  assert.equal(B.bytesToBase64Url(q), Buffer.from(q).toString("base64url"));
+  assert.equal(B.bytesToBase64Url(new Uint8Array([0xff])), "_w");
+  assert.equal(B.bytesToBase64Url(new Uint8Array([1, 2])), Buffer.from([1, 2]).toString("base64url"));
+  assert.equal(B.bytesToBase64Url(new Uint8Array([])), "");
+});
+
+// Build a synthetic DNS response (question + one TXT answer) for decode tests.
+function buildTxtResponse(host, txt) {
+  const q = B.encodeDnsTxtQuery(host); // header + question
+  const rdata = [];
+  for (let i = 0; i < txt.length; i += 255) {
+    const seg = txt.slice(i, i + 255);
+    rdata.push(seg.length);
+    for (let j = 0; j < seg.length; j++) {
+      rdata.push(seg.charCodeAt(j));
+    }
+  }
+  const answer = [
+    0xc0, 0x0c, // name: compression pointer to the question at offset 12
+    0x00, 0x10, // type TXT
+    0x00, 0x01, // class IN
+    0x00, 0x00, 0x0e, 0x10, // TTL 3600
+    (rdata.length >> 8) & 0xff, rdata.length & 0xff,
+    ...rdata
+  ];
+  const out = new Uint8Array(q.length + answer.length);
+  out.set(q, 0);
+  out.set(answer, q.length);
+  out[2] = 0x81; out[3] = 0x80; // flags: QR=1, RD=1, RA=1
+  out[7] = 0x01; // ANCOUNT=1
+  return out;
+}
+
+test("decodeDnsTxtAnswers extracts a TXT record from a response", () => {
+  const txt = "v=BIMI1; l=https://example.com/logo.svg";
+  const resp = buildTxtResponse("default._bimi.example.com", txt);
+  assert.deepEqual(B.decodeDnsTxtAnswers(resp), [txt]);
+});
+
+test("decodeDnsTxtAnswers rejoins a record split across character-strings", () => {
+  const txt = "v=BIMI1; l=https://example.com/" + "a".repeat(300) + ".svg"; // > 255 bytes
+  const resp = buildTxtResponse("default._bimi.example.com", txt);
+  assert.deepEqual(B.decodeDnsTxtAnswers(resp), [txt]);
+});
+
+test("decodeDnsTxtAnswers tolerates empty/short input", () => {
+  assert.deepEqual(B.decodeDnsTxtAnswers(new Uint8Array([])), []);
+  assert.deepEqual(B.decodeDnsTxtAnswers(null), []);
+  assert.deepEqual(B.decodeDnsTxtAnswers(new Uint8Array([0, 0, 0])), []);
+});
+
+test("a wireformat TXT response round-trips into parseBimiRecord", () => {
+  const resp = buildTxtResponse(
+    "default._bimi.disneyplus.com",
+    "v=BIMI1; l=https://secure.disney.com/bimi/logo.svg; a="
+  );
+  const [txt] = B.decodeDnsTxtAnswers(resp);
+  assert.equal(
+    B.parseBimiRecord(txt).logoUrl,
+    "https://secure.disney.com/bimi/logo.svg"
+  );
+});
+
 test("isFresh honors the refresh window", () => {
   const now = 1_000_000_000_000;
   assert.equal(B.isFresh(now - 1000, 24, now), true);

@@ -618,7 +618,12 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
         const base = String(s.bimiDohCustomUrl || "").trim();
         if (/^https:\/\/\S+$/i.test(base)) {
           const sep = base.includes("?") ? "&" : "?";
-          return { name: "custom (" + base + ")", url: base + sep + "type=TXT&name=" };
+          return {
+            name: "custom (" + base + ")",
+            url: base + sep + "type=TXT&name=", // JSON-API form
+            endpoint: base, // raw endpoint for the RFC 8484 wireformat
+            custom: true
+          };
         }
         return CLOUDFLARE; // invalid/empty custom URL
       }
@@ -627,10 +632,15 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     }
   }
 
-  // TXT lookup over DNS-over-HTTPS (JSON), using the configured provider. Returns
-  // the record string (preferring a BIMI1 record), or null. This is what makes
-  // BIMI work on a normal profile, at the cost of sending the queried name to the
-  // DoH provider instead of the system resolver.
+  // TXT lookup over DNS-over-HTTPS, using the configured provider. Returns the
+  // record string (preferring a BIMI1 record), or null. This is what makes BIMI
+  // work on a normal profile, at the cost of sending the queried name to the DoH
+  // provider instead of the system resolver.
+  //
+  // The built-in Cloudflare/Google providers use the JSON DoH API. Custom
+  // endpoints try the universal RFC 8484 binary wireformat first (AdGuard, Quad9,
+  // NextDNS, self-hosted resolvers and even Google's /dns-query only speak that),
+  // and fall back to JSON for the rarer JSON-only endpoint.
   async _dnsTxtDoH(host, log) {
     const note = (m) => {
       this._blog(m);
@@ -640,7 +650,23 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     };
     const p = this._dohProvider();
     note("Falling back to DNS-over-HTTPS via " + p.name + " …");
-    const txt = await this._dohFetch(p.url + encodeURIComponent(host), log);
+
+    if (p.custom) {
+      const wire = await this._dohFetchWire(p.endpoint, host, log);
+      if (wire) {
+        note("DoH returned (wireformat): " + wire);
+        return wire;
+      }
+      note("Wireformat lookup yielded nothing; trying the JSON DoH API …");
+      const json = await this._dohFetchJson(p.url + encodeURIComponent(host), log);
+      if (json) {
+        note("DoH returned (JSON): " + json);
+        return json;
+      }
+      return null;
+    }
+
+    const txt = await this._dohFetchJson(p.url + encodeURIComponent(host), log);
     if (txt) {
       note("DoH returned: " + txt);
       return txt;
@@ -697,7 +723,11 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
             try {
               const avail = stream.available();
               if (avail > 0) {
-                text = NetUtil.readInputStreamToString(stream, avail, { charset: "UTF-8" });
+                // Binary mode (DNS wireformat) reads raw bytes as a Latin-1 string
+                // — one char per byte — so the bytes survive intact for decoding.
+                text = options.binary
+                  ? NetUtil.readInputStreamToString(stream, avail)
+                  : NetUtil.readInputStreamToString(stream, avail, { charset: "UTF-8" });
               }
             } catch (e) {
               /* empty body */
@@ -718,7 +748,14 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
           async (resp) => {
             let text = "";
             try {
-              text = await resp.text();
+              if (options.binary) {
+                const u8 = new Uint8Array(await resp.arrayBuffer());
+                for (let i = 0; i < u8.length; i++) {
+                  text += String.fromCharCode(u8[i]);
+                }
+              } else {
+                text = await resp.text();
+              }
             } catch (e2) {
               /* ignore */
             }
@@ -730,7 +767,8 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     });
   }
 
-  async _dohFetch(url, log) {
+  // TXT lookup via the JSON DoH API (Cloudflare/Google style).
+  async _dohFetchJson(url, log) {
     const note = (m) => {
       this._blog(m);
       if (log) {
@@ -762,6 +800,53 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       return bimi || candidates[0] || null;
     } catch (e) {
       note("DoH parse error: " + (e && e.message ? e.message : e));
+      return null;
+    }
+  }
+
+  // TXT lookup via the RFC 8484 DNS-wireformat: a binary query base64url-encoded
+  // into the URL's `dns` parameter, with an Accept of application/dns-message.
+  // This is the format every standards-compliant DoH endpoint understands.
+  async _dohFetchWire(endpoint, host, log) {
+    const note = (m) => {
+      this._blog(m);
+      if (log) {
+        log.push(m);
+      }
+    };
+    const Bimi = globalThis.ThundericonBimi;
+    if (!Bimi || !Bimi.encodeDnsTxtQuery) {
+      return null;
+    }
+    let url;
+    try {
+      const dns = Bimi.bytesToBase64Url(Bimi.encodeDnsTxtQuery(host));
+      const sep = endpoint.includes("?") ? "&" : "?";
+      url = endpoint + sep + "dns=" + dns;
+    } catch (e) {
+      note("DoH wireformat: failed to build query: " + (e && e.message ? e.message : e));
+      return null;
+    }
+    const res = await this._httpGet(url, {
+      headers: { accept: "application/dns-message" },
+      binary: true,
+      log
+    });
+    if (!res.ok) {
+      note("DoH wireformat request failed (" + (res.status || res.error || "?") + ")");
+      return null;
+    }
+    try {
+      const bin = res.text || "";
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) {
+        bytes[i] = bin.charCodeAt(i) & 0xff;
+      }
+      const answers = Bimi.decodeDnsTxtAnswers(bytes);
+      const bimi = answers.find((c) => /^v\s*=\s*BIMI1/i.test(c));
+      return bimi || answers[0] || null;
+    } catch (e) {
+      note("DoH wireformat parse error: " + (e && e.message ? e.message : e));
       return null;
     }
   }

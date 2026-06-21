@@ -172,9 +172,13 @@
             </select>
           </label>
           <div class="row stack conditional" id="bimiCustomGroup" hidden>
-            <span>Custom DoH URL (JSON)</span>
+            <span>Custom DoH endpoint URL</span>
             <input type="text" id="bimiDohCustomUrl" spellcheck="false"
-                   placeholder="https://resolver.example/dns-query" />
+                   placeholder="https://dns.adguard-dns.com/dns-query" />
+            <span class="hint">
+              Works with standard DoH resolvers (e.g. AdGuard, Quad9, NextDNS,
+              self-hosted) as well as Cloudflare/Google-style JSON endpoints.
+            </span>
           </div>
           <p class="hint">
             Thunderbird's system resolver can't read the TXT records BIMI needs, so

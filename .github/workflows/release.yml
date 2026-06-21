@@ -44,6 +44,26 @@ jobs:
           tmp=$(mktemp); jq --arg v "$V" '.version=$v' manifest.json > "$tmp" && mv "$tmp" manifest.json
           tmp=$(mktemp); jq --arg v "$V" '.version=$v' package.json  > "$tmp" && mv "$tmp" package.json
 
+      # Experiment add-ons must pin strict_max_version. Derive it from the current
+      # Thunderbird release (Mozilla's machine-readable product-details feed) so it
+      # tracks the latest version instead of going stale. Falls back to the
+      # committed value if the feed is unreachable.
+      - name: Set strict_max_version to the latest Thunderbird
+        run: |
+          LATEST=$(curl -fsSL --max-time 20 \
+            https://product-details.mozilla.org/1.0/thunderbird_versions.json \
+            | jq -r '.LATEST_THUNDERBIRD_VERSION // empty')
+          MAJOR="${LATEST%%.*}"
+          if [[ "$MAJOR" =~ ^[0-9]+$ ]]; then
+            MAXV="${MAJOR}.*"
+            echo "Latest Thunderbird is $LATEST -> strict_max_version = $MAXV"
+            tmp=$(mktemp)
+            jq --arg m "$MAXV" '.browser_specific_settings.gecko.strict_max_version = $m' \
+              manifest.json > "$tmp" && mv "$tmp" manifest.json
+          else
+            echo "::warning::Could not read latest Thunderbird version (got '$LATEST'); keeping committed strict_max_version"
+          fi
+
       - name: Package
         run: python3 tools/package.py
 

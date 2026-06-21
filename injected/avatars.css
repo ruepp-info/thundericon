@@ -84,20 +84,30 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   margin: 0;
 }
 
-/* BIMI: a verified brand logo replaces the initials. The badge keeps its size
- * and border-radius (so a circular badge clips the logo to a circle); the
- * colored fill and glyph styling give way to the image. Two-class selector so
- * it overrides .ti-avatar's fill and .ti-avatar--row's `overflow: visible`
- * (defined earlier with the same specificity). */
-.ti-avatar.ti-avatar--bimi {
+/* Image badges: a verified BIMI brand logo or a Gravatar profile photo replaces
+ * the initials. The badge keeps its size and border-radius (so a circular badge
+ * clips the image to a circle); the colored fill and glyph styling give way to
+ * the image. Two-class selector so it overrides .ti-avatar's fill and
+ * .ti-avatar--row's `overflow: visible` (defined earlier, same specificity). */
+.ti-avatar.ti-avatar--bimi,
+.ti-avatar.ti-avatar--photo {
   background-color: transparent;
   overflow: hidden;
   letter-spacing: 0;
 }
 
+/* BIMI logos are line-art on transparency: contain them, never crop. */
 .ti-avatar--bimi img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* Gravatar photos are real images: fill the badge edge-to-edge (crop to fit). */
+.ti-avatar--photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

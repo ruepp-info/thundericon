@@ -419,6 +419,175 @@ test("still resolves BIMI in a non-excluded folder (Inbox)", async () => {
   assert.ok(tbody.querySelector(".ti-avatar--bimi img"));
 });
 
+/* ---- Gravatar photo branch -------------------------------------------- */
+
+function gravatarConfig() {
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.gravatarEnabled = true;
+  cfg.settings.gravatarRefreshHours = 168;
+  return cfg;
+}
+
+test("renders a Gravatar photo when the host resolves one, initials otherwise", async () => {
+  const { window, doc, tbody, authors } = setup();
+  const PHOTO = "data:image/png;base64,iVBORw0KGgo=";
+  window.__thundericonHost = {
+    resolveGravatar(email, cb) {
+      cb(email === "gp@photos.test" ? PHOTO : null);
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(gravatarConfig()));
+
+  authors[0] = "Gravatar Person <gp@photos.test>";
+  authors[1] = "Plain Person <p@plain.org>";
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  tbody.appendChild(addRow(doc, { index: 1 }));
+
+  await waitFor(() => tbody.querySelector(".ti-avatar--photo img"));
+  await settle();
+
+  const rows = [...tbody.querySelectorAll('tr[is="thread-row"]')];
+  const photoBadge = rows[0].querySelector(".ti-avatar");
+  assert.ok(photoBadge.classList.contains("ti-avatar--photo"));
+  assert.ok(!photoBadge.classList.contains("ti-avatar--bimi"));
+  const img = photoBadge.querySelector("img");
+  assert.ok(img, "photo row has an <img>");
+  assert.equal(img.getAttribute("src"), PHOTO);
+  assert.equal(photoBadge.textContent, "", "initials text cleared under the photo");
+  assert.equal(rows[0].querySelectorAll(".ti-avatar").length, 1);
+
+  const plainBadge = rows[1].querySelector(".ti-avatar");
+  assert.equal(plainBadge.querySelector("img"), null);
+  assert.equal(plainBadge.textContent, "PP");
+  assert.ok(!plainBadge.classList.contains("ti-avatar--photo"));
+});
+
+test("Gravatar photo takes precedence over a BIMI logo when both resolve", async () => {
+  const { window, doc, tbody, authors } = setup();
+  const PHOTO = "data:image/png;base64,photo";
+  const LOGO = "data:image/svg+xml,logo";
+  window.__thundericonHost = {
+    resolveGravatar(email, cb) {
+      cb(PHOTO);
+    },
+    resolveBimi(domain, hdr, cb) {
+      cb(LOGO);
+    }
+  };
+  const cfg = gravatarConfig();
+  cfg.settings.bimiEnabled = true;
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  authors[0] = "Both Co <hi@both.test>";
+  const row = addRow(doc, { index: 0 });
+  tbody.appendChild(row);
+
+  await waitFor(() => row.querySelector(".ti-avatar--photo img"));
+  await settle();
+
+  const badge = row.querySelector(".ti-avatar");
+  assert.ok(badge.classList.contains("ti-avatar--photo"), "shows the photo");
+  assert.ok(!badge.classList.contains("ti-avatar--bimi"), "not the logo");
+  assert.equal(badge.querySelector("img").getAttribute("src"), PHOTO);
+  assert.equal(row.querySelectorAll(".ti-avatar").length, 1);
+});
+
+test("falls back to the BIMI logo when there is no Gravatar photo", async () => {
+  const { window, doc, tbody, authors } = setup();
+  const LOGO = "data:image/svg+xml,logo";
+  window.__thundericonHost = {
+    resolveGravatar(email, cb) {
+      cb(null); // no photo
+    },
+    resolveBimi(domain, hdr, cb) {
+      cb(LOGO);
+    }
+  };
+  const cfg = gravatarConfig();
+  cfg.settings.bimiEnabled = true;
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  authors[0] = "Brand Co <hi@brand.test>";
+  const row = addRow(doc, { index: 0 });
+  tbody.appendChild(row);
+
+  await waitFor(() => row.querySelector(".ti-avatar--bimi img"));
+  const badge = row.querySelector(".ti-avatar");
+  assert.ok(badge.classList.contains("ti-avatar--bimi"));
+  assert.ok(!badge.classList.contains("ti-avatar--photo"));
+  assert.equal(badge.querySelector("img").getAttribute("src"), LOGO);
+});
+
+test("does not consult the host for Gravatar when it is disabled", async () => {
+  const { window, doc, tbody, authors } = setup();
+  let calls = 0;
+  window.__thundericonHost = {
+    resolveGravatar() {
+      calls++;
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG)); // gravatarEnabled absent => off
+
+  authors[0] = "Gravatar Person <gp@photos.test>";
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  await waitFor(() => tbody.querySelector(".ti-avatar"));
+  await settle();
+
+  assert.equal(calls, 0, "host never called while Gravatar is off");
+  assert.equal(tbody.querySelector(".ti-avatar").textContent, "GP");
+});
+
+test("skips Gravatar lookups in excluded folders (Sent) and keeps initials", async () => {
+  const { window, doc, tbody, authors, folderFlags } = setup();
+  let calls = 0;
+  window.__thundericonHost = {
+    resolveGravatar(email, cb) {
+      calls++;
+      cb("data:image/png;base64,photo");
+    }
+  };
+  const cfg = gravatarConfig();
+  cfg.settings.gravatarSkipFolders = { sent: true };
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  authors[0] = "Gravatar Person <gp@photos.test>";
+  folderFlags[0] = 0x00000200; // nsMsgFolderFlags.SentMail
+  tbody.appendChild(addRow(doc, { index: 0 }));
+  await waitFor(() => tbody.querySelector(".ti-avatar"));
+  await settle();
+
+  assert.equal(calls, 0, "host never consulted for an excluded folder");
+  const badge = tbody.querySelector(".ti-avatar");
+  assert.equal(badge.querySelector("img"), null);
+  assert.equal(badge.textContent, "GP");
+});
+
+test("disabling Gravatar reverts a shown photo back to initials", async () => {
+  const { window, doc, tbody, authors } = setup();
+  window.__thundericonHost = {
+    resolveGravatar(email, cb) {
+      cb("data:image/png;base64,photo");
+    }
+  };
+  window.__thundericon.apply(JSON.stringify(gravatarConfig()));
+
+  authors[0] = "Gravatar Person <gp@photos.test>";
+  const row = addRow(doc, { index: 0 });
+  tbody.appendChild(row);
+  await waitFor(() => row.querySelector(".ti-avatar--photo img"));
+
+  const off = gravatarConfig();
+  off.settings.gravatarEnabled = false;
+  window.__thundericon.apply(JSON.stringify(off));
+
+  await waitFor(() => {
+    const b = row.querySelector(".ti-avatar");
+    return b && !b.classList.contains("ti-avatar--photo") && b.textContent === "GP";
+  });
+  assert.equal(row.querySelector("img"), null, "photo <img> removed");
+  assert.equal(row.querySelectorAll(".ti-avatar").length, 1);
+});
+
 test("destroy() removes every badge and clears root variables", async () => {
   const { window, doc, tbody, authors } = setup();
   window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));

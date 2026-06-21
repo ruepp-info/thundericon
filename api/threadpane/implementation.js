@@ -20,6 +20,12 @@ var { ExtensionSupport } = ChromeUtils.importESModule(
 
 const MESSENGER_WINDOW = "chrome://messenger/content/messenger.xhtml";
 const STYLE_ID = "thundericon-style";
+// Pixel size requested from Gravatar (crisp up to ~48px badges on HiDPI). Fixed
+// so the cache key stays stable regardless of badge-size settings.
+const GRAVATAR_PX = 80;
+// Reject anything larger than this (parity with the BIMI SVG cap); a profile
+// photo at GRAVATAR_PX is comfortably under it.
+const GRAVATAR_MAX_BYTES = 64 * 1024;
 // Diagnostic logging for the BIMI resolution chain (Error Console). The "Test
 // BIMI…" window builds its own in-window log independently, so this can stay off
 // for normal use; flip to true to also trace live-list resolution to the console.
@@ -111,6 +117,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       this._rendererURL = context.extension.getURL("injected/avatar-renderer.js");
       this._cssURL = context.extension.getURL("injected/avatars.css");
       this._bimiCoreURL = context.extension.getURL("src/bimi-core.js");
+      this._gravatarCoreURL = context.extension.getURL("src/gravatar-core.js");
       this._listenerId = "thundericon-" + context.extension.id;
       this._mailWindows = new Set(); // messenger windows we have hooked
       this._renderers = new Set(); // about:3pane content windows we injected into
@@ -120,6 +127,9 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       this._bimiInflight = new Map(); // domain -> Promise (coalesce concurrent lookups)
       this._dmarcCache = new Map(); // messageId -> bool (session only)
       this._bimiLoaded = false;
+      this._gravatarCache = new Map(); // email -> { status, logo, ts }
+      this._gravatarInflight = new Map(); // email -> Promise (coalesce concurrent lookups)
+      this._gravatarLoaded = false;
     }
 
     return {
@@ -137,6 +147,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
             this._reportError("Failed to load stylesheet: " + e);
           }
           this._ensureBimiCore();
+          this._ensureGravatarCore();
           ExtensionSupport.registerWindowListener(this._listenerId, {
             chromeURLs: [MESSENGER_WINDOW],
             onLoadWindow: (win) => this._hookWindow(win)
@@ -157,7 +168,18 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
           }
         },
 
+        seedGravatarCache: async (cacheJson) => {
+          try {
+            const obj = JSON.parse(cacheJson || "{}");
+            this._gravatarCache = new Map(Object.entries(obj));
+          } catch (e) {
+            this._gravatarCache = new Map();
+          }
+        },
+
         testBimi: async (query) => this._runBimiTest(query),
+
+        testGravatar: async (query) => this._runGravatarTest(query),
 
         stop: async () => {
           this._teardown();
@@ -181,6 +203,17 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
             this._fireBimi = (domain, entryJson) => fire.async(domain, entryJson);
             return () => {
               this._fireBimi = null;
+            };
+          }
+        }).api(),
+
+        onGravatarResolved: new ExtensionCommon.EventManager({
+          context,
+          name: "threadPaneAvatars.onGravatarResolved",
+          register: (fire) => {
+            this._fireGravatar = (emailKey, entryJson) => fire.async(emailKey, entryJson);
+            return () => {
+              this._fireGravatar = null;
             };
           }
         }).api()
@@ -294,13 +327,31 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
         Services.scriptloader.loadSubScript(this._rendererURL, cw);
         this._renderers.add(cw);
       }
-      // Host bridge the renderer calls to resolve a BIMI logo for a message.
+      // Host bridge the renderer calls to resolve a logo/photo for a message.
       cw.__thundericonHost = {
         resolveBimi: (domain, msgHdr, cb) => {
           this._resolveBimi(domain, msgHdr).then(
             (logo) => {
               try {
                 cb(logo);
+              } catch (e) {
+                /* renderer gone */
+              }
+            },
+            () => {
+              try {
+                cb(null);
+              } catch (e) {
+                /* renderer gone */
+              }
+            }
+          );
+        },
+        resolveGravatar: (email, cb) => {
+          this._resolveGravatar(email).then(
+            (photo) => {
+              try {
+                cb(photo);
               } catch (e) {
                 /* renderer gone */
               }
@@ -678,8 +729,8 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
             try {
               const avail = stream.available();
               if (avail > 0) {
-                // Binary mode (DNS wireformat) reads raw bytes as a Latin-1 string
-                // — one char per byte — so the bytes survive intact for decoding.
+                // Binary mode (DNS wireformat, images) reads raw bytes as a
+                // Latin-1 string — one char per byte — so the bytes survive intact.
                 text = options.binary
                   ? NetUtil.readInputStreamToString(stream, avail)
                   : NetUtil.readInputStreamToString(stream, avail, { charset: "UTF-8" });
@@ -687,7 +738,18 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
             } catch (e) {
               /* empty body */
             }
-            resolve({ ok: httpStatus >= 200 && httpStatus < 300, status: httpStatus, text });
+            let contentType = "";
+            try {
+              contentType = request.contentType || "";
+            } catch (e) {
+              /* non-http or unavailable */
+            }
+            resolve({
+              ok: httpStatus >= 200 && httpStatus < 300,
+              status: httpStatus,
+              text,
+              contentType
+            });
           } catch (e) {
             fail(e && e.message ? e.message : String(e));
           }
@@ -714,7 +776,13 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
             } catch (e2) {
               /* ignore */
             }
-            resolve({ ok: resp.ok, status: resp.status, text });
+            let contentType = "";
+            try {
+              contentType = resp.headers.get("content-type") || "";
+            } catch (e2) {
+              /* ignore */
+            }
+            resolve({ ok: resp.ok, status: resp.status, text, contentType });
           },
           (e2) => fail(e2 && e2.message ? e2.message : String(e2))
         );
@@ -846,6 +914,172 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
         resolve(false);
       }
     });
+  }
+
+  /* ---- Gravatar resolution ---------------------------------------------- */
+
+  _ensureGravatarCore() {
+    if (this._gravatarLoaded) {
+      return;
+    }
+    try {
+      Services.scriptloader.loadSubScript(this._gravatarCoreURL, globalThis);
+      this._gravatarLoaded = !!globalThis.ThundericonGravatar;
+      this._blog("gravatar-core loaded:", this._gravatarLoaded);
+    } catch (e) {
+      this._reportError("gravatar-core load failed: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  // Resolve the Gravatar photo for a sender address, honoring the TTL'd cache.
+  // Returns a data: URL string or null. Always resolves (never rejects) — any
+  // failure means "no photo", so the renderer falls back to BIMI / initials.
+  // Unlike BIMI there is no DNS or DMARC step: the URL is derived from the hash.
+  async _resolveGravatar(email) {
+    try {
+      const settings = (this._config && this._config.settings) || {};
+      const G = globalThis.ThundericonGravatar;
+      const Bimi = globalThis.ThundericonBimi;
+      if (!settings.gravatarEnabled || !email || !G) {
+        return null;
+      }
+      const key = G.normalizeEmail(email);
+      if (!key) {
+        return null;
+      }
+      // Cached result — a found photo OR a cached "none" (respecting the refresh
+      // TTL). Negative results are cached too, so an address without a Gravatar is
+      // looked up once per refresh window rather than once per message.
+      const entry = this._gravatarCache.get(key);
+      if (entry && Bimi && Bimi.isFresh(entry.ts, settings.gravatarRefreshHours, Date.now())) {
+        this._blog("gravatar", key, "→ cache hit:", entry.status);
+        return entry.status === "ok" ? entry.logo : null;
+      }
+      const fresh = await this._resolveGravatarFresh(key);
+      return fresh.status === "ok" ? fresh.logo : null;
+    } catch (e) {
+      this._blog("gravatar resolve error:", e && e.message ? e.message : e);
+      return null;
+    }
+  }
+
+  // Fetch and cache an address's Gravatar status (a found photo OR a "none"),
+  // de-duplicating concurrent lookups per address (a folder full of mail from the
+  // same sender asks at once). The result is cached (and persisted) for the
+  // refresh window.
+  _resolveGravatarFresh(emailKey) {
+    const inflight = this._gravatarInflight.get(emailKey);
+    if (inflight) {
+      return inflight;
+    }
+    const promise = (async () => {
+      const photo = await this._fetchGravatar(emailKey);
+      const fresh = photo
+        ? { status: "ok", logo: photo, ts: Date.now() }
+        : { status: "none", logo: null, ts: Date.now() };
+      this._gravatarCache.set(emailKey, fresh);
+      this._blog("gravatar", emailKey, "→ resolved:", fresh.status);
+      if (this._fireGravatar) {
+        try {
+          this._fireGravatar(emailKey, JSON.stringify(fresh));
+        } catch (e) {
+          /* no listener */
+        }
+      }
+      return fresh;
+    })();
+    this._gravatarInflight.set(emailKey, promise);
+    promise.then(
+      () => this._gravatarInflight.delete(emailKey),
+      () => this._gravatarInflight.delete(emailKey)
+    );
+    return promise;
+  }
+
+  async _fetchGravatar(emailKey, log) {
+    const G = globalThis.ThundericonGravatar;
+    if (!G) {
+      return null;
+    }
+    const hash = G.hashEmail(emailKey);
+    if (!hash) {
+      return null;
+    }
+    const url = G.avatarUrl(hash, GRAVATAR_PX);
+    return this._fetchImageDataUrl(url, log);
+  }
+
+  // Fetch a remote raster image (system principal, no CORS) and return a base64
+  // data: URL. With Gravatar's `d=404`, a missing photo comes back as HTTP 404 →
+  // null. Rejects non-image or oversized responses. Resolves to null on failure.
+  async _fetchImageDataUrl(url, log) {
+    const note = this._noter(log);
+    const G = globalThis.ThundericonGravatar;
+    const res = await this._httpGet(url, { binary: true, log });
+    if (!res.ok) {
+      // 404 is the normal "this address has no Gravatar" answer.
+      note("Image HTTP " + (res.status || res.error || "?") + " → no photo");
+      return null;
+    }
+    const ct = (res.contentType || "").toLowerCase().split(";")[0].trim();
+    const bin = res.text || "";
+    const size = bin.length;
+    note("Image HTTP " + res.status + ", " + size + " bytes, type=" + (ct || "(none)"));
+    if (!/^image\//.test(ct)) {
+      note("→ rejected: response is not an image");
+      return null;
+    }
+    if (size === 0 || size > GRAVATAR_MAX_BYTES) {
+      note("→ rejected: " + (size === 0 ? "empty body" : "larger than " + GRAVATAR_MAX_BYTES + " bytes"));
+      return null;
+    }
+    if (!G || !G.bytesToBase64) {
+      return null;
+    }
+    const bytes = new Uint8Array(size);
+    for (let i = 0; i < size; i++) {
+      bytes[i] = bin.charCodeAt(i) & 0xff;
+    }
+    return "data:" + ct + ";base64," + G.bytesToBase64(bytes);
+  }
+
+  // Diagnostic resolve used by the options "Test Gravatar" window. Runs the real
+  // hash + image-fetch path (the SAME code as the live list). Returns a structured
+  // result with a human-readable step log so problems are visible to the user.
+  async _runGravatarTest(query) {
+    const log = [];
+    const out = (m) => {
+      log.push(m);
+      this._blog("[gravatar test]", m);
+    };
+    try {
+      this._ensureGravatarCore();
+      const G = globalThis.ThundericonGravatar;
+      if (!G) {
+        out("ERROR: gravatar-core module is not loaded.");
+        return { ok: false, log };
+      }
+      const email = G.normalizeEmail(query);
+      if (!email) {
+        out("ERROR: please enter a full email address (e.g. name@example.com).");
+        return { ok: false, log };
+      }
+      out("Address: " + email);
+      const hash = G.hashEmail(email);
+      out("MD5 hash: " + hash);
+      const url = G.avatarUrl(hash, GRAVATAR_PX);
+      out("Fetching: " + url);
+      const dataUrl = await this._fetchImageDataUrl(url, log);
+      if (!dataUrl) {
+        out("Result: no Gravatar photo for this address (or it failed validation).");
+        return { ok: false, email, hash, url, log };
+      }
+      out("SUCCESS: a Gravatar photo is available for " + email + ".");
+      return { ok: true, email, hash, url, dataUrl, log };
+    } catch (e) {
+      out("ERROR: " + (e && e.message ? e.message : e));
+      return { ok: false, log };
+    }
   }
 
   /* ---- teardown --------------------------------------------------------- */

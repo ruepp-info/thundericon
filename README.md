@@ -1,9 +1,9 @@
 # Thundericon
 
 Minimalist **sender avatars** for the Thunderbird message list. A circular badge
-with the sender's initials — or the brand's **verified BIMI logo** when available —
-is injected into every row of the thread tree, in both **Table** and **Cards**
-layouts, without blocking the main thread.
+with the sender's initials — or the sender's **Gravatar photo** / the brand's
+**verified BIMI logo** when available — is injected into every row of the thread
+tree, in both **Table** and **Cards** layouts, without blocking the main thread.
 
 ![Thundericon in the Thunderbird message list: sender-initial avatars alongside verified BIMI brand logos (Disney+, LinkedIn)](thundericon_preview.png)
 
@@ -29,6 +29,13 @@ layouts, without blocking the main thread.
   cached per domain and persisted across restarts. Optional "base-domain only"
   lookup (so `mail2.disneyplus.com` resolves `disneyplus.com`) and per-folder
   skips (Sent, Drafts, Junk, …).
+- **Gravatar profile photos, opt-in.** When a sender has a [Gravatar](https://gravatar.com)
+  photo for their address, it replaces the initials — and **takes precedence over
+  a BIMI logo** if both exist. A lookup sends a hash of the sender's address to
+  gravatar.com, so it is **off by default**. Results — *including "no photo"* — are
+  cached per address and persisted, with a long default refresh (1 week, since
+  Gravatars change rarely) and the same per-folder skips. A built-in **Test
+  Gravatar…** tool shows the hash, URL and a step-by-step log.
 - **Typography & geometry.** Font family, weight, uppercase, initials length
   (1–2) and source (display name / email), badge size, and corner radius
   (0–50%, where 50% = circle).
@@ -40,11 +47,12 @@ layouts, without blocking the main thread.
 | File | Role |
 | --- | --- |
 | `manifest.json` | MV3, registers the experiment, background, and options. |
-| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane`. Injects the renderer + CSS, relays config, resolves BIMI logos (DoH + DMARC + SVG fetch) with per-domain caching, and tears down cleanly. |
-| `injected/avatar-renderer.js` | Runs inside `about:3pane`: observer, idle batching, recycle-aware decoration, per-message BIMI requests. |
+| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane`. Injects the renderer + CSS, relays config, resolves BIMI logos (DoH + DMARC + SVG fetch) and Gravatar photos (MD5 + image fetch) with caching, and tears down cleanly. |
+| `injected/avatar-renderer.js` | Runs inside `about:3pane`: observer, idle batching, recycle-aware decoration, per-message BIMI/Gravatar requests (Gravatar > BIMI > initials). |
 | `injected/avatars.css` | Badge styling, driven entirely by CSS custom properties. |
 | `src/avatar-core.js` | Shared, pure logic: initials + color (used by renderer **and** options preview). |
 | `src/bimi-core.js` | Shared, pure BIMI logic: record parsing, DMARC-pass check, base-domain reduction, DNS-wireformat encode/decode. |
+| `src/gravatar-core.js` | Shared, pure Gravatar logic: email normalization, MD5, avatar URL, standard base64. |
 | `src/config.js` | Defaults + `storage.local` load/save/subscribe. |
 | `background.js` | Loads config, starts the experiment, relays changes. |
 | `options/` | Configuration UI with a live preview. |
@@ -106,19 +114,22 @@ If a temporary load still shows a grayed Options button, check that
 
 ```sh
 npm ci        # dev-only: jsdom for the renderer harness
-npm test      # node --test  (47 tests)
+npm test      # node --test  (61 tests)
 ```
 
 - `test/avatar-core.test.js` — pure logic: parsing, initials, all color modes,
   domain overrides, contrast, hex normalization.
 - `test/bimi-core.test.js` — BIMI record parsing, the DMARC-pass check,
   base-domain reduction, and DNS-wireformat encode/decode/base64url.
+- `test/gravatar-core.test.js` — MD5 (known vectors + Node-crypto cross-check),
+  email normalization, the documented Gravatar hash example, avatar URL, base64.
 - `test/config.test.js` — defaults, `storage.local` round-trip + merge, change
   subscription (storage mocked).
 - `test/renderer.test.js` — drives `avatar-renderer.js` against a **jsdom**
   `about:3pane`: badge rendering, **no duplicates**, **virtualized-row recycling**,
-  idempotency, layout toggles, BIMI logo swap-in, the DMARC gate, folder skipping,
-  the `gDBView` scraping fallback, enable/disable, and clean `destroy()`.
+  idempotency, layout toggles, BIMI/Gravatar image swap-in, **Gravatar-over-BIMI
+  precedence**, the DMARC gate, folder skipping, the `gDBView` scraping fallback,
+  enable/disable, and clean `destroy()`.
 
 > These cover the pure modules and ~the whole renderer. The privileged experiment
 > bridge (`api/threadpane/`) and true end-to-end still require a live Thunderbird
@@ -131,4 +142,7 @@ npm test      # node --test  (47 tests)
 - Scroll a large folder fast → no jank, no duplicate/stale badges.
 - **Options** → change color mode / font / size / radius, add a `domain → color`
   mapping → the open list updates without restart.
+- **Options → Profile photos (Gravatar)** → enable, then open a folder with a
+  sender who has a Gravatar → their photo replaces the initials. Use **Test
+  Gravatar…** with a known address to confirm the hash/fetch path.
 - Disable the add-on → all badges and injected styles are removed cleanly.

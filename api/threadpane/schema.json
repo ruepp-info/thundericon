@@ -61,6 +61,31 @@
             "description": "An email address or bare domain to test."
           }
         ]
+      },
+      {
+        "name": "seedGravatarCache",
+        "type": "function",
+        "description": "Seed/replace the in-memory Gravatar photo cache from persisted storage (JSON string of email -> entry).",
+        "async": true,
+        "parameters": [
+          {
+            "name": "cacheJson",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "testGravatar",
+        "type": "function",
+        "description": "Diagnostic: resolve an address's Gravatar photo and return a step-by-step log plus the photo data URL.",
+        "async": true,
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "description": "An email address to test."
+          }
+        ]
       }
     ],
     "events": [
@@ -82,6 +107,21 @@
         "parameters": [
           {
             "name": "domain",
+            "type": "string"
+          },
+          {
+            "name": "entryJson",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "onGravatarResolved",
+        "type": "function",
+        "description": "Fired when an address's Gravatar photo is resolved, so it can be persisted.",
+        "parameters": [
+          {
+            "name": "emailKey",
             "type": "string"
           },
           {

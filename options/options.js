@@ -32,6 +32,15 @@ const SKIP_FOLDERS = [
   ["bimiSkipTrash", "trash"]
 ];
 
+const GRAVATAR_SKIP_FOLDERS = [
+  ["gravatarSkipSent", "sent"],
+  ["gravatarSkipDrafts", "drafts"],
+  ["gravatarSkipTemplates", "templates"],
+  ["gravatarSkipOutbox", "outbox"],
+  ["gravatarSkipJunk", "junk"],
+  ["gravatarSkipTrash", "trash"]
+];
+
 init();
 
 // Show the running add-on version (read from the manifest, so it never drifts).
@@ -86,13 +95,20 @@ function populate() {
 
   $("bimiEnabled").checked = s.bimiEnabled === true;
   $("bimiBaseDomainOnly").checked = s.bimiBaseDomainOnly === true;
-  $("bimiRefreshHours").value = String(s.bimiRefreshHours || 24);
+  $("bimiRefreshHours").value = String(s.bimiRefreshHours || 168);
   $("bimiDohProvider").value = s.bimiDohProvider || "adguard-family";
   $("bimiDohCustomUrl").value = s.bimiDohCustomUrl || "";
 
   const skip = s.bimiSkipFolders || {};
   for (const [id, key] of SKIP_FOLDERS) {
     $(id).checked = skip[key] === true;
+  }
+
+  $("gravatarEnabled").checked = s.gravatarEnabled === true;
+  $("gravatarRefreshHours").value = String(s.gravatarRefreshHours || 168);
+  const gravatarSkip = s.gravatarSkipFolders || {};
+  for (const [id, key] of GRAVATAR_SKIP_FOLDERS) {
+    $(id).checked = gravatarSkip[key] === true;
   }
 
   renderPalette();
@@ -107,7 +123,8 @@ function wire() {
     "enabled", "layoutTable", "layoutCards", "badgeSize", "borderRadius",
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor", "bimiEnabled", "bimiBaseDomainOnly",
-    "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl"
+    "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
+    "gravatarEnabled", "gravatarRefreshHours"
   ];
   for (const id of scalars) {
     $(id).addEventListener("input", commit);
@@ -116,8 +133,13 @@ function wire() {
   for (const [id] of SKIP_FOLDERS) {
     $(id).addEventListener("change", commit);
   }
+  for (const [id] of GRAVATAR_SKIP_FOLDERS) {
+    $(id).addEventListener("change", commit);
+  }
   $("bimiClear").addEventListener("click", clearBimiCache);
   $("bimiTest").addEventListener("click", openBimiTest);
+  $("gravatarClear").addEventListener("click", clearGravatarCache);
+  $("gravatarTest").addEventListener("click", openGravatarTest);
   $("addColor").addEventListener("click", () => {
     state.settings.customPalette = (state.settings.customPalette || []).concat("#6e8198");
     renderPalette();
@@ -228,19 +250,34 @@ function collectScalars() {
   s.fixedColor = $("fixedColor").value;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
-  s.bimiRefreshHours = parseInt($("bimiRefreshHours").value, 10) || 24;
+  s.bimiRefreshHours = parseInt($("bimiRefreshHours").value, 10) || 168;
   s.bimiDohProvider = $("bimiDohProvider").value;
   s.bimiDohCustomUrl = $("bimiDohCustomUrl").value.trim();
   s.bimiSkipFolders = {};
   for (const [id, key] of SKIP_FOLDERS) {
     s.bimiSkipFolders[key] = $(id).checked;
   }
+  s.gravatarEnabled = $("gravatarEnabled").checked;
+  s.gravatarRefreshHours = parseInt($("gravatarRefreshHours").value, 10) || 168;
+  s.gravatarSkipFolders = {};
+  for (const [id, key] of GRAVATAR_SKIP_FOLDERS) {
+    s.gravatarSkipFolders[key] = $(id).checked;
+  }
 }
 
 // Open the standalone BIMI test tool in its own window (tab as a fallback).
 async function openBimiTest() {
+  await openTestWindow("options/bimi-test.html");
+}
+
+// Open the standalone Gravatar test tool in its own window (tab as a fallback).
+async function openGravatarTest() {
+  await openTestWindow("options/gravatar-test.html");
+}
+
+async function openTestWindow(page) {
   const rt = (typeof messenger !== "undefined" ? messenger : browser);
-  const url = rt.runtime.getURL("options/bimi-test.html");
+  const url = rt.runtime.getURL(page);
   try {
     await rt.windows.create({ url, type: "popup", width: 680, height: 640 });
   } catch (e) {
@@ -269,32 +306,54 @@ async function clearBimiCache() {
   }
 }
 
-// Show a small cache-usage summary (entry count, how many hold a logo, and the
-// approximate stored size) next to the Clear button — purely informational.
+// Ask the background to wipe the persisted + in-memory Gravatar photo caches.
+async function clearGravatarCache() {
+  const btn = $("gravatarClear");
+  btn.disabled = true;
+  try {
+    const rt = (typeof messenger !== "undefined" ? messenger : browser).runtime;
+    await rt.sendMessage({ type: "thundericon:clearGravatar" });
+    flashStatus("Photo cache cleared");
+    updateCacheStats();
+  } catch (e) {
+    flashStatus("Clear failed");
+  } finally {
+    // updateGravatarState re-disables it if Gravatar is off.
+    updateGravatarState();
+  }
+}
+
+// Show a small cache-usage summary (entry count, how many hold an image, and the
+// approximate stored size) next to each Clear button — purely informational.
 async function updateCacheStats() {
-  const el = $("bimiCacheStats");
+  await updateOneCacheStat("bimiCacheStats", "bimiCache", "logos");
+  await updateOneCacheStat("gravatarCacheStats", "gravatarCache", "photos");
+}
+
+async function updateOneCacheStat(elId, storageKey, noun) {
+  const el = $(elId);
   if (!el) {
     return;
   }
   try {
     const rt = typeof messenger !== "undefined" ? messenger : browser;
-    const stored = await rt.storage.local.get("bimiCache");
-    const cache = (stored && stored.bimiCache) || {};
+    const stored = await rt.storage.local.get(storageKey);
+    const cache = (stored && stored[storageKey]) || {};
     const keys = Object.keys(cache);
     if (!keys.length) {
       el.textContent = "(empty)";
       return;
     }
-    let logos = 0;
+    let hits = 0;
     for (const k of keys) {
       if (cache[k] && cache[k].status === "ok") {
-        logos++;
+        hits++;
       }
     }
     const bytes = new TextEncoder().encode(JSON.stringify(cache)).length;
     el.textContent =
       keys.length + (keys.length === 1 ? " entry" : " entries") +
-      ", " + logos + " with logos · " + formatBytes(bytes);
+      ", " + hits + " with " + noun + " · " + formatBytes(bytes);
   } catch (e) {
     el.textContent = "";
   }
@@ -310,12 +369,12 @@ function formatBytes(n) {
   return (n / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-// Refresh the stats live as logos resolve and get persisted in the background.
+// Refresh the stats live as logos/photos resolve and get persisted in the background.
 function watchCacheStats() {
   const rt = typeof messenger !== "undefined" ? messenger : browser;
   if (rt.storage && rt.storage.onChanged) {
     rt.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && changes.bimiCache) {
+      if (area === "local" && (changes.bimiCache || changes.gravatarCache)) {
         updateCacheStats();
       }
     });
@@ -369,6 +428,7 @@ function sideEffects() {
 
   updateEnabledState();
   updateBimiState();
+  updateGravatarState();
   applyRootVars();
   renderPreview();
 }
@@ -398,6 +458,18 @@ function updateBimiState() {
   const custom = $("bimiDohProvider").value === "custom";
   $("bimiCustomGroup").hidden = !custom;
   $("bimiDohCustomUrl").disabled = !on || !custom;
+}
+
+// The refresh interval, folder skips and clear button only matter when Gravatar
+// is on, so gray them out (and disable them) while it is off.
+function updateGravatarState() {
+  const on = $("gravatarEnabled").checked;
+  $("gravatarRefreshHours").disabled = !on;
+  $("gravatarClear").disabled = !on;
+  $("gravatarGroup").classList.toggle("disabled", !on);
+  for (const [id] of GRAVATAR_SKIP_FOLDERS) {
+    $(id).disabled = !on;
+  }
 }
 
 function applyRootVars() {

@@ -13,21 +13,31 @@ const api = typeof messenger !== "undefined" ? messenger : browser;
 
 let starting = null;
 
-// BIMI logo cache persistence. Resolved logos are written back to storage.local
-// (debounced/coalesced) so they survive restarts and feed the experiment on the
-// next launch. Capped so a long-lived profile can't grow the cache unbounded.
+// BIMI/Gravatar cache persistence. Resolved logos/photos are written back to
+// storage.local (debounced/coalesced) so they survive restarts and feed the
+// experiment on the next launch. Capped so a long-lived profile can't grow the
+// cache unbounded.
 const BIMI_MAX_ENTRIES = 500;
 let bimiPendingWrites = new Map(); // domain -> { status, logo, ts }
 let bimiFlushTimer = null;
 
+const GRAVATAR_MAX_ENTRIES = 500;
+let gravatarPendingWrites = new Map(); // email -> { status, logo, ts }
+let gravatarFlushTimer = null;
+
 async function startAvatars() {
   const config = await ThundericonConfig.load();
   await api.threadPaneAvatars.start(config);
-  // Prime the experiment's in-memory logo cache from what we persisted.
+  // Prime the experiment's in-memory caches from what we persisted.
   try {
     await api.threadPaneAvatars.seedBimiCache(JSON.stringify(config.bimiCache || {}));
   } catch (e) {
     console.error("[Thundericon] seedBimiCache failed:", e);
+  }
+  try {
+    await api.threadPaneAvatars.seedGravatarCache(JSON.stringify(config.gravatarCache || {}));
+  } catch (e) {
+    console.error("[Thundericon] seedGravatarCache failed:", e);
   }
 }
 
@@ -51,15 +61,42 @@ async function flushBimiWrites() {
     for (const [domain, entry] of writes) {
       cache[domain] = entry;
     }
-    capBimiCache(cache, BIMI_MAX_ENTRIES);
+    capCache(cache, BIMI_MAX_ENTRIES);
     await api.storage.local.set({ bimiCache: cache });
   } catch (e) {
     console.error("[Thundericon] bimi persist failed:", e);
   }
 }
 
+function scheduleGravatarFlush() {
+  if (gravatarFlushTimer) {
+    return;
+  }
+  gravatarFlushTimer = setTimeout(flushGravatarWrites, 1500);
+}
+
+async function flushGravatarWrites() {
+  gravatarFlushTimer = null;
+  if (!gravatarPendingWrites.size) {
+    return;
+  }
+  const writes = gravatarPendingWrites;
+  gravatarPendingWrites = new Map();
+  try {
+    const stored = await api.storage.local.get("gravatarCache");
+    const cache = (stored && stored.gravatarCache) || {};
+    for (const [email, entry] of writes) {
+      cache[email] = entry;
+    }
+    capCache(cache, GRAVATAR_MAX_ENTRIES);
+    await api.storage.local.set({ gravatarCache: cache });
+  } catch (e) {
+    console.error("[Thundericon] gravatar persist failed:", e);
+  }
+}
+
 // Evict the oldest entries (by timestamp) once over the cap.
-function capBimiCache(cache, max) {
+function capCache(cache, max) {
   const keys = Object.keys(cache);
   if (keys.length <= max) {
     return;
@@ -84,6 +121,28 @@ async function clearBimiCache() {
     /* experiment may not be started yet */
   }
   // Re-push config so open lists drop their per-message logos and re-resolve.
+  const config = await ThundericonConfig.load();
+  try {
+    await api.threadPaneAvatars.updateConfig(config);
+  } catch (e) {
+    /* nothing injected yet */
+  }
+}
+
+// Wipe the persisted + in-memory Gravatar caches and force a fresh re-resolve.
+async function clearGravatarCache() {
+  gravatarPendingWrites = new Map();
+  if (gravatarFlushTimer) {
+    clearTimeout(gravatarFlushTimer);
+    gravatarFlushTimer = null;
+  }
+  await api.storage.local.set({ gravatarCache: {} });
+  try {
+    await api.threadPaneAvatars.seedGravatarCache("{}");
+  } catch (e) {
+    /* experiment may not be started yet */
+  }
+  // Re-push config so open lists drop their per-message photos and re-resolve.
   const config = await ThundericonConfig.load();
   try {
     await api.threadPaneAvatars.updateConfig(config);
@@ -131,7 +190,19 @@ if (api.threadPaneAvatars && api.threadPaneAvatars.onBimiResolved) {
   });
 }
 
-// The options page asks us to clear the BIMI cache via a runtime message.
+// Persist Gravatar photos as the experiment resolves them.
+if (api.threadPaneAvatars && api.threadPaneAvatars.onGravatarResolved) {
+  api.threadPaneAvatars.onGravatarResolved.addListener((email, entryJson) => {
+    try {
+      gravatarPendingWrites.set(email, JSON.parse(entryJson));
+      scheduleGravatarFlush();
+    } catch (e) {
+      /* ignore malformed entry */
+    }
+  });
+}
+
+// The options page asks us to clear the BIMI / Gravatar caches via a message.
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "thundericon:clearBimi") {
     clearBimiCache().then(
@@ -139,6 +210,13 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (e) => sendResponse({ ok: false, error: String(e) })
     );
     return true; // keep the message channel open for the async response
+  }
+  if (msg && msg.type === "thundericon:clearGravatar") {
+    clearGravatarCache().then(
+      () => sendResponse({ ok: true }),
+      (e) => sendResponse({ ok: false, error: String(e) })
+    );
+    return true;
   }
   return false;
 });

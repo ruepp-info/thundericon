@@ -37,7 +37,7 @@
 
       // BIMI (Brand Indicators for Message Identification) — opt-in.
       bimiEnabled: false,
-      bimiRefreshHours: 24,
+      bimiRefreshHours: 168, // 1 week (logos change rarely, like Gravatars)
       // Look up the logo on the sender's registrable ("base") domain instead of
       // the exact From domain, e.g. resolve test@trx.mail2.disneyplus.com against
       // disneyplus.com. Lets a brand's subdomains share one published logo.
@@ -59,12 +59,30 @@
         outbox: true,
         junk: true,
         trash: false
+      },
+
+      // Gravatar profile photos — opt-in. A lookup sends a hash of the sender's
+      // address to gravatar.com, so this is off by default. Photos take
+      // precedence over BIMI logos. The refresh interval is much longer than
+      // BIMI's: people change their Gravatar rarely.
+      gravatarEnabled: false,
+      gravatarRefreshHours: 168, // 1 week
+      // Folder types to skip Gravatar lookups in (same roles as BIMI).
+      gravatarSkipFolders: {
+        sent: true,
+        drafts: true,
+        templates: true,
+        outbox: true,
+        junk: true,
+        trash: false
       }
     },
     // domain -> hex override map, e.g. { "example.com": "#8a9a5b" }
     domainColors: {},
     // domain -> { status:"ok"|"none", logo:<dataURL>|null, ts:<epoch ms> }
-    bimiCache: {}
+    bimiCache: {},
+    // email -> { status:"ok"|"none", logo:<dataURL>|null, ts:<epoch ms> }
+    gravatarCache: {}
   };
 
   function deepClone(obj) {
@@ -89,12 +107,22 @@
           stored.settings.bimiSkipFolders
         );
       }
+      if (stored.settings.gravatarSkipFolders) {
+        out.settings.gravatarSkipFolders = Object.assign(
+          {},
+          DEFAULTS.settings.gravatarSkipFolders,
+          stored.settings.gravatarSkipFolders
+        );
+      }
     }
     if (stored && stored.domainColors && typeof stored.domainColors === "object") {
       out.domainColors = deepClone(stored.domainColors);
     }
     if (stored && stored.bimiCache && typeof stored.bimiCache === "object") {
       out.bimiCache = deepClone(stored.bimiCache);
+    }
+    if (stored && stored.gravatarCache && typeof stored.gravatarCache === "object") {
+      out.gravatarCache = deepClone(stored.gravatarCache);
     }
     return out;
   }
@@ -104,7 +132,12 @@
     if (!api || !api.storage) {
       return deepClone(DEFAULTS);
     }
-    const stored = await api.storage.local.get(["settings", "domainColors", "bimiCache"]);
+    const stored = await api.storage.local.get([
+      "settings",
+      "domainColors",
+      "bimiCache",
+      "gravatarCache"
+    ]);
     return mergeSettings(stored);
   }
 

@@ -28,8 +28,8 @@
   const ROW_SELECTOR = 'tr[is="thread-row"], tr[is="thread-card"]';
   const Core = win.ThundericonCore;
 
-  // nsMsgFolderFlags values used to skip BIMI lookups by folder role. Kept as raw
-  // numbers so the renderer needs no privileged Ci access.
+  // nsMsgFolderFlags values used to skip BIMI/Gravatar lookups by folder role.
+  // Kept as raw numbers so the renderer needs no privileged Ci access.
   const FOLDER_FLAGS = {
     sent: 0x00000200,
     drafts: 0x00000400,
@@ -56,6 +56,12 @@
   let bimiEnabled = false;
   let bimiByMsg = new Map(); // messageId -> dataURL string | null
   let bimiPendingMsg = new Set(); // messageId currently being resolved
+
+  // Gravatar: like BIMI, resolution is async and per-message, but keyed on the
+  // sender address (the host hashes it). Photos take precedence over BIMI logos.
+  let gravatarEnabled = false;
+  let gravatarByMsg = new Map(); // messageId -> dataURL string | null
+  let gravatarPendingMsg = new Set(); // messageId currently being resolved
 
   /* ---- tbody discovery -------------------------------------------------- */
 
@@ -224,20 +230,29 @@
     const author = authorFrom(hdr, row);
     const desc = Core.describe(author, settings, domainColors);
 
-    // BIMI is active for this row unless its folder is excluded (own/untrusted
-    // mail like Sent, Drafts or Junk has no meaningful brand identity).
-    const bimiOn = bimiEnabled && !folderSkipped(hdr);
+    // Gravatar / BIMI are active for this row unless its folder is excluded
+    // (own/untrusted mail like Sent, Drafts or Junk).
+    const gravatarOn = gravatarEnabled && !folderSkipped(hdr, settings.gravatarSkipFolders);
+    const bimiOn = bimiEnabled && !folderSkipped(hdr, settings.bimiSkipFolders);
 
-    // BIMI logo for this specific message, if already resolved.
+    // Pick the image to show for this specific message, if already resolved.
+    // Precedence: Gravatar photo > BIMI logo > initials. A map entry whose value
+    // is null means "resolved, nothing to show" → fall through to the next source.
     const msgId = hdr && hdr.messageId ? hdr.messageId : "";
-    let logo = null;
-    if (bimiOn && msgId && bimiByMsg.has(msgId)) {
-      logo = bimiByMsg.get(msgId); // string data URL or null
+    let img = null;
+    let kind = "";
+    if (gravatarOn && msgId && gravatarByMsg.get(msgId)) {
+      img = gravatarByMsg.get(msgId);
+      kind = "photo";
+    } else if (bimiOn && msgId && bimiByMsg.get(msgId)) {
+      img = bimiByMsg.get(msgId);
+      kind = "bimi";
     }
 
-    // Signature folds in whether we render a logo, so an async logo arriving
-    // (initials -> logo) still triggers a re-render on the recycled-row fast path.
-    const sig = desc.key + (logo ? "|L" : "|I");
+    // Signature folds in which image we render, so an async image arriving
+    // (initials -> photo/logo) still triggers a re-render on the recycled-row
+    // fast path, as does a photo superseding a logo.
+    const sig = desc.key + (img ? (kind === "photo" ? "|G" : "|B") : "|I");
     if (rowKeys.get(row) === sig && existing) {
       return; // recycled row, identical render — nothing to do
     }
@@ -250,21 +265,25 @@
         "ti-avatar " + (layout === "card" ? "ti-avatar--card" : "ti-avatar--row");
       placeBadge(row, badge, layout);
     }
-    if (logo) {
-      renderLogo(badge, logo, author || desc.initials);
+    if (img) {
+      renderLogo(badge, img, author || desc.initials, kind);
     } else {
       renderInitials(badge, desc, author);
     }
 
-    // Not yet resolved → ask the privileged host (DNS + DMARC + SVG fetch).
+    // Not yet resolved → ask the privileged host. Both run in parallel; negative
+    // results are cached, so this converges (and stays cheap) once all are known.
+    if (gravatarOn && msgId && hdr && !gravatarByMsg.has(msgId)) {
+      requestGravatar(desc.email, msgId);
+    }
     if (bimiOn && msgId && hdr && !bimiByMsg.has(msgId)) {
       requestBimi(desc.email, hdr, msgId);
     }
   }
 
-  // Should BIMI be skipped for this message because of its folder? Reads the
-  // message folder's flags and matches them against the configured skip set.
-  function folderSkipped(hdr) {
+  // Should a lookup be skipped for this message because of its folder? Reads the
+  // message folder's flags and matches them against the given skip set.
+  function folderSkipped(hdr, skip) {
     let flags = 0;
     try {
       if (hdr && hdr.folder) {
@@ -276,7 +295,7 @@
     if (!flags) {
       return false;
     }
-    const skip = settings.bimiSkipFolders || {};
+    skip = skip || {};
     for (const key in FOLDER_FLAGS) {
       if (skip[key] && (flags & FOLDER_FLAGS[key]) !== 0) {
         return true;
@@ -287,6 +306,7 @@
 
   function renderInitials(badge, desc, author) {
     badge.classList.remove("ti-avatar--bimi");
+    badge.classList.remove("ti-avatar--photo");
     const img = badge.querySelector("img");
     if (img) {
       img.remove();
@@ -297,8 +317,12 @@
     badge.title = author || desc.initials;
   }
 
-  function renderLogo(badge, dataUrl, title) {
-    badge.classList.add("ti-avatar--bimi");
+  // Swap initials for an image. `kind` selects the styling: "photo" (Gravatar,
+  // cropped to fill) or "bimi" (brand logo, contained with transparent padding).
+  function renderLogo(badge, dataUrl, title, kind) {
+    const photo = kind === "photo";
+    badge.classList.toggle("ti-avatar--photo", photo);
+    badge.classList.toggle("ti-avatar--bimi", !photo);
     badge.textContent = "";
     let img = badge.querySelector("img");
     if (!img) {
@@ -342,6 +366,37 @@
       });
     } catch (e) {
       bimiPendingMsg.delete(msgId);
+    }
+  }
+
+  // Ask the privileged experiment to resolve a Gravatar photo for this message.
+  // The host hashes the address and owns the TTL'd image cache; we record the
+  // per-message answer and re-scan visible rows when a photo actually arrives.
+  function requestGravatar(email, msgId) {
+    const host = win.__thundericonHost;
+    if (!host || typeof host.resolveGravatar !== "function") {
+      return;
+    }
+    if (!email || gravatarPendingMsg.has(msgId)) {
+      return;
+    }
+    gravatarPendingMsg.add(msgId);
+    try {
+      host.resolveGravatar(email, (dataUrl) => {
+        gravatarPendingMsg.delete(msgId);
+        if (!gravatarEnabled) {
+          return; // disabled while in flight
+        }
+        gravatarByMsg.set(msgId, dataUrl || null);
+        // Only a positive result changes what is on screen (rows show initials or
+        // a BIMI logo by default); re-enqueue so the matching row swaps in its
+        // photo. Idle-batched and deduped, so this stays cheap and converges.
+        if (dataUrl) {
+          enqueueAllRows();
+        }
+      });
+    } catch (e) {
+      gravatarPendingMsg.delete(msgId);
     }
   }
 
@@ -500,12 +555,15 @@
     rowKeys = new WeakMap();
     enabled = settings.enabled !== false;
 
-    // Re-resolve BIMI on every config push. Cheap (the host keeps a TTL'd DNS/SVG
-    // cache, so usually no network), and it lets the options "Clear" button take
+    // Re-resolve BIMI/Gravatar on every config push. Cheap (the host keeps TTL'd
+    // caches, so usually no network), and it lets the options "Clear" buttons take
     // effect: clearing storage + re-pushing config drops these per-message caches.
     bimiEnabled = settings.bimiEnabled === true;
     bimiByMsg = new Map();
     bimiPendingMsg = new Set();
+    gravatarEnabled = settings.gravatarEnabled === true;
+    gravatarByMsg = new Map();
+    gravatarPendingMsg = new Set();
 
     if (!enabled) {
       if (observer) {
@@ -547,6 +605,8 @@
         pending = new Set();
         bimiByMsg = new Map();
         bimiPendingMsg = new Set();
+        gravatarByMsg = new Map();
+        gravatarPendingMsg = new Set();
       } catch (e) {
         /* best effort */
       }

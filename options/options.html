@@ -160,7 +160,9 @@
               <option value="12">12 hours</option>
               <option value="24">24 hours (daily)</option>
               <option value="72">3 days</option>
-              <option value="168">1 week</option>
+              <option value="168">1 week (recommended)</option>
+              <option value="336">2 weeks</option>
+              <option value="720">1 month</option>
             </select>
           </label>
           <label class="row">
@@ -214,6 +216,61 @@
             <button type="button" id="bimiTest" class="ghost">Test BIMI…</button>
           </div>
           <p class="hint">Opens a tool to check whether a given domain publishes a BIMI logo, with a step-by-step log.</p>
+        </div>
+      </section>
+
+      <!-- Gravatar profile photos -->
+      <section class="card span2">
+        <h2>Profile photos (Gravatar)</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="gravatarEnabled" />
+          <span>Show Gravatar profile photos</span>
+        </label>
+        <p class="hint">
+          When a sender has a <a href="https://gravatar.com" target="_blank"
+          rel="noopener noreferrer">Gravatar</a> profile photo for their address,
+          show it in place of the initials; everyone else keeps initials. Profile
+          photos take precedence over BIMI brand logos. A lookup sends a hash of
+          the sender's email address to gravatar.com, so this is off by default.
+        </p>
+
+        <div class="subgroup" id="gravatarGroup">
+          <label class="row">
+            <span>Refresh photos every</span>
+            <select id="gravatarRefreshHours">
+              <option value="24">1 day</option>
+              <option value="72">3 days</option>
+              <option value="168">1 week (recommended)</option>
+              <option value="336">2 weeks</option>
+              <option value="720">1 month</option>
+            </select>
+          </label>
+          <p class="hint">
+            People change their Gravatar rarely, so a long refresh keeps lookups to
+            a minimum. Negative results (no photo) are cached for the same period.
+          </p>
+          <div class="folder-skip">
+            <span class="lbl">Don't look up photos in these folders:</span>
+            <div class="folder-grid">
+              <label class="row switch"><input type="checkbox" id="gravatarSkipSent" /><span>Sent</span></label>
+              <label class="row switch"><input type="checkbox" id="gravatarSkipDrafts" /><span>Drafts</span></label>
+              <label class="row switch"><input type="checkbox" id="gravatarSkipTemplates" /><span>Templates</span></label>
+              <label class="row switch"><input type="checkbox" id="gravatarSkipOutbox" /><span>Outbox</span></label>
+              <label class="row switch"><input type="checkbox" id="gravatarSkipJunk" /><span>Junk (Spam)</span></label>
+              <label class="row switch"><input type="checkbox" id="gravatarSkipTrash" /><span>Trash</span></label>
+            </div>
+          </div>
+          <div class="row">
+            <span>Cached photos <span class="cache-stats" id="gravatarCacheStats"></span></span>
+            <button type="button" id="gravatarClear" class="ghost">Clear photo cache</button>
+          </div>
+          <p class="hint">Clearing forces every photo to be re-fetched on next view.</p>
+
+          <div class="row">
+            <span>Troubleshooting</span>
+            <button type="button" id="gravatarTest" class="ghost">Test Gravatar…</button>
+          </div>
+          <p class="hint">Opens a tool to check whether a given address has a Gravatar photo, with a step-by-step log.</p>
         </div>
       </section>
     </div>

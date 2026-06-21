@@ -1,8 +1,11 @@
 # Thundericon
 
-Minimalist **sender-initial avatars** for the Thunderbird message list. A circular
-badge with the sender's initials is injected into every row of the thread tree —
-in both **Table** and **Cards** layouts — without blocking the main thread.
+Minimalist **sender avatars** for the Thunderbird message list. A circular badge
+with the sender's initials — or the brand's **verified BIMI logo** when available —
+is injected into every row of the thread tree, in both **Table** and **Cards**
+layouts, without blocking the main thread.
+
+![Thundericon in the Thunderbird message list: sender-initial avatars alongside verified BIMI brand logos (Disney+, LinkedIn)](thundericon_preview.png)
 
 ![icon](icons/icon-64.png)
 
@@ -18,6 +21,14 @@ in both **Table** and **Cards** layouts — without blocking the main thread.
   low-saturation hue, vibrant HSL hash, a single fixed color, or your own custom
   palette. Per-sender colors are stable across sessions (deterministic hash).
 - **Domain → color overrides.** Pin a color for everyone at `example.com`.
+- **Verified brand logos (BIMI), opt-in.** When a sender's domain publishes a
+  BIMI logo **and** the message passes DMARC, the brand's logo replaces the
+  initials; everyone else keeps initials. Lookups run purely over DNS-over-HTTPS
+  (Cloudflare, Quad9, Mullvad, AdGuard family/standard, Cisco Umbrella/OpenDNS,
+  Google, or a custom RFC 8484 endpoint), with results — *including "no logo"* —
+  cached per domain and persisted across restarts. Optional "base-domain only"
+  lookup (so `mail2.disneyplus.com` resolves `disneyplus.com`) and per-folder
+  skips (Sent, Drafts, Junk, …).
 - **Typography & geometry.** Font family, weight, uppercase, initials length
   (1–2) and source (display name / email), badge size, and corner radius
   (0–50%, where 50% = circle).
@@ -29,10 +40,11 @@ in both **Table** and **Cards** layouts — without blocking the main thread.
 | File | Role |
 | --- | --- |
 | `manifest.json` | MV3, registers the experiment, background, and options. |
-| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane`. Injects the renderer + CSS into each message list, relays config, tears down cleanly. |
-| `injected/avatar-renderer.js` | Runs inside `about:3pane`: observer, idle batching, recycle-aware decoration. |
+| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane`. Injects the renderer + CSS, relays config, resolves BIMI logos (DoH + DMARC + SVG fetch) with per-domain caching, and tears down cleanly. |
+| `injected/avatar-renderer.js` | Runs inside `about:3pane`: observer, idle batching, recycle-aware decoration, per-message BIMI requests. |
 | `injected/avatars.css` | Badge styling, driven entirely by CSS custom properties. |
 | `src/avatar-core.js` | Shared, pure logic: initials + color (used by renderer **and** options preview). |
+| `src/bimi-core.js` | Shared, pure BIMI logic: record parsing, DMARC-pass check, base-domain reduction, DNS-wireformat encode/decode. |
 | `src/config.js` | Defaults + `storage.local` load/save/subscribe. |
 | `background.js` | Loads config, starts the experiment, relays changes. |
 | `options/` | Configuration UI with a live preview. |
@@ -40,8 +52,10 @@ in both **Table** and **Cards** layouts — without blocking the main thread.
 > The message list lives in the privileged `about:3pane` document, which ordinary
 > WebExtension content scripts cannot touch — hence the small experiment bridge.
 > It uses internal globals (`gDBView`, thread-tree DOM) that are not stable
-> WebExtension API, so the add-on pins `strict_min_version: 141` and falls back to
-> scraping the correspondent cell if the DB view is unavailable.
+> WebExtension API, so the add-on declares a Thunderbird version range
+> (`strict_min_version` 128.0; `strict_max_version` is set to the current release
+> at build time) and falls back to scraping the correspondent cell if the DB view
+> is unavailable.
 
 ## Build
 
@@ -58,6 +72,9 @@ installable archive:
 `build.sh` aborts (non-zero) if the manifest is invalid or references a missing
 file, so it never emits a broken add-on. Lower-level helpers remain available:
 `python3 tools/package.py` (validate + zip) and `python3 tools/make-icons.py`.
+
+Tagged releases are built and attached to GitHub Releases automatically (version
+and `strict_max_version` are injected at build time) — see [`RELEASE.md`](RELEASE.md).
 
 ## Install
 
@@ -88,18 +105,20 @@ If a temporary load still shows a grayed Options button, check that
 ## Tests
 
 ```sh
-npm install   # dev-only: jsdom for the renderer harness
-npm test      # node --test  (26 tests)
+npm ci        # dev-only: jsdom for the renderer harness
+npm test      # node --test  (47 tests)
 ```
 
 - `test/avatar-core.test.js` — pure logic: parsing, initials, all color modes,
   domain overrides, contrast, hex normalization.
+- `test/bimi-core.test.js` — BIMI record parsing, the DMARC-pass check,
+  base-domain reduction, and DNS-wireformat encode/decode/base64url.
 - `test/config.test.js` — defaults, `storage.local` round-trip + merge, change
   subscription (storage mocked).
 - `test/renderer.test.js` — drives `avatar-renderer.js` against a **jsdom**
   `about:3pane`: badge rendering, **no duplicates**, **virtualized-row recycling**,
-  idempotency, layout toggles, the `gDBView` scraping fallback, enable/disable,
-  and clean `destroy()`.
+  idempotency, layout toggles, BIMI logo swap-in, the DMARC gate, folder skipping,
+  the `gDBView` scraping fallback, enable/disable, and clean `destroy()`.
 
 > These cover the pure modules and ~the whole renderer. The privileged experiment
 > bridge (`api/threadpane/`) and true end-to-end still require a live Thunderbird

@@ -33,11 +33,14 @@ Wait ~1 minute, then `thundericon-1.2.3.xpi` appears under the release's **Asset
    and pushed to GitHub.
 2. **Green CI.** `ci.yml` runs `npm ci && npm test` + manifest validation on every
    push/PR. Make sure the latest commit passed before tagging.
-3. **Check Thunderbird compatibility** (this is manual — the pipeline does not
-   touch it). Because this is an Experiment add-on, `manifest.json` pins
-   `strict_min_version` / `strict_max_version`. If you've tested on a newer
-   Thunderbird, bump `strict_max_version` (e.g. `"141.*"`) and commit that first,
-   otherwise the release will declare itself incompatible with current Thunderbird.
+3. **Thunderbird compatibility is automatic.** Because this is an Experiment
+   add-on, `manifest.json` must pin `strict_max_version`. The release workflow sets
+   it to the current Thunderbird release at build time (`<major>.*`, read from
+   Mozilla's product-details feed), so it never goes stale — you don't bump it by
+   hand. The committed value is only a fallback for local builds and if the feed is
+   unreachable. Caveat: this declares compatibility with the latest Thunderbird, so
+   ideally smoke-test on it (step 4) since an Experiment can break when internal
+   APIs change. `strict_min_version` is still set by hand.
 4. *(Optional)* **Smoke-test the build locally:** `./build.sh --test` produces
    `dist/thundericon-<version>.xpi` from the committed version, so you can load it
    in Thunderbird before cutting the release.

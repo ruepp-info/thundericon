@@ -44,7 +44,10 @@
       bimiBaseDomainOnly: true,
       // TXT lookups use Thunderbird's resolver first, then DNS-over-HTTPS (the
       // OS resolver can't do TXT). Which DoH provider to use for that fallback:
-      bimiDohProvider: "cloudflare", // cloudflare | google | custom
+      // adguard-family | cloudflare-family | opendns-family | adguard | cloudflare |
+      // opendns | quad9 | mullvad | google | custom.
+      // Default to AdGuard Family Protection so DNS lookups block explicit content.
+      bimiDohProvider: "adguard-family",
       bimiDohCustomUrl: "", // JSON DoH endpoint, used when provider = custom
 
       // Folder types to skip BIMI lookups in (own/untrusted mail). Keyed by

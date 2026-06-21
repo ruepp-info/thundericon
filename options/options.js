@@ -85,7 +85,7 @@ function populate() {
   $("bimiEnabled").checked = s.bimiEnabled === true;
   $("bimiBaseDomainOnly").checked = s.bimiBaseDomainOnly === true;
   $("bimiRefreshHours").value = String(s.bimiRefreshHours || 24);
-  $("bimiDohProvider").value = s.bimiDohProvider || "cloudflare";
+  $("bimiDohProvider").value = s.bimiDohProvider || "adguard-family";
   $("bimiDohCustomUrl").value = s.bimiDohCustomUrl || "";
 
   const skip = s.bimiSkipFolders || {};

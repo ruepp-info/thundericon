@@ -166,8 +166,15 @@
           <label class="row">
             <span>DNS lookup</span>
             <select id="bimiDohProvider">
-              <option value="cloudflare">Cloudflare DoH</option>
-              <option value="google">Google DoH</option>
+              <option value="adguard-family">AdGuard DNS (Family — blocks explicit content, no-log)</option>
+              <option value="cloudflare-family">Cloudflare for Families (blocks malware + adult content)</option>
+              <option value="opendns-family">Cisco Umbrella FamilyShield (blocks adult content)</option>
+              <option value="adguard">AdGuard DNS (ad-blocking, no-log)</option>
+              <option value="cloudflare">Cloudflare (1.1.1.1)</option>
+              <option value="opendns">Cisco Umbrella / OpenDNS</option>
+              <option value="quad9">Quad9 (security, no-log)</option>
+              <option value="mullvad">Mullvad (no-log)</option>
+              <option value="google">Google (8.8.8.8)</option>
               <option value="custom">Custom DoH endpoint…</option>
             </select>
           </label>

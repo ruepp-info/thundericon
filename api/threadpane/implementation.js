@@ -601,46 +601,90 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     });
   }
 
-  // The DoH provider to use for TXT, per user settings. Returns a single
-  // { name, url } — we honor the explicit choice rather than silently querying a
-  // different provider. An invalid custom URL falls back to Cloudflare so BIMI
-  // still works.
+  // The DoH provider to use for TXT, per user settings. Returns a descriptor
+  // { name, jsonUrl?, endpoint?, modes } where `modes` lists the lookup methods
+  // to try in order. Cloudflare/Google expose the JSON API (tried first, with the
+  // wireformat as a fallback); the privacy resolvers (Quad9, Mullvad, AdGuard)
+  // speak only the universal RFC 8484 wireformat. We honor the explicit choice
+  // rather than silently querying a different provider; an invalid/empty custom
+  // URL falls back to Cloudflare so BIMI still works.
   _dohProvider() {
-    const CLOUDFLARE = {
-      name: "Cloudflare",
-      url: "https://cloudflare-dns.com/dns-query?type=TXT&name="
+    const BUILTIN = {
+      // Content-filtering / family-safe resolvers.
+      "adguard-family": {
+        name: "AdGuard DNS (Family Protection)",
+        endpoint: "https://family.adguard-dns.com/dns-query",
+        modes: ["wire"]
+      },
+      "cloudflare-family": {
+        name: "Cloudflare (Family Protection)",
+        jsonUrl: "https://family.cloudflare-dns.com/dns-query?type=TXT&name=",
+        endpoint: "https://family.cloudflare-dns.com/dns-query",
+        modes: ["json", "wire"]
+      },
+      "opendns-family": {
+        name: "Cisco Umbrella FamilyShield",
+        endpoint: "https://doh.familyshield.opendns.com/dns-query",
+        modes: ["wire"]
+      },
+      // General-purpose resolvers.
+      adguard: {
+        name: "AdGuard DNS",
+        endpoint: "https://dns.adguard-dns.com/dns-query",
+        modes: ["wire"]
+      },
+      cloudflare: {
+        name: "Cloudflare",
+        jsonUrl: "https://cloudflare-dns.com/dns-query?type=TXT&name=",
+        endpoint: "https://cloudflare-dns.com/dns-query",
+        modes: ["json", "wire"]
+      },
+      opendns: {
+        name: "Cisco Umbrella (OpenDNS)",
+        endpoint: "https://doh.opendns.com/dns-query",
+        modes: ["wire"]
+      },
+      quad9: {
+        name: "Quad9",
+        endpoint: "https://dns.quad9.net/dns-query",
+        modes: ["wire"]
+      },
+      mullvad: {
+        name: "Mullvad",
+        endpoint: "https://dns.mullvad.net/dns-query",
+        modes: ["wire"]
+      },
+      google: {
+        name: "Google",
+        jsonUrl: "https://dns.google/resolve?type=TXT&name=",
+        endpoint: "https://dns.google/dns-query",
+        modes: ["json", "wire"]
+      }
     };
     const s = (this._config && this._config.settings) || {};
-    switch (s.bimiDohProvider) {
-      case "google":
-        return { name: "Google", url: "https://dns.google/resolve?type=TXT&name=" };
-      case "custom": {
-        const base = String(s.bimiDohCustomUrl || "").trim();
-        if (/^https:\/\/\S+$/i.test(base)) {
-          const sep = base.includes("?") ? "&" : "?";
-          return {
-            name: "custom (" + base + ")",
-            url: base + sep + "type=TXT&name=", // JSON-API form
-            endpoint: base, // raw endpoint for the RFC 8484 wireformat
-            custom: true
-          };
-        }
-        return CLOUDFLARE; // invalid/empty custom URL
+    if (s.bimiDohProvider === "custom") {
+      const base = String(s.bimiDohCustomUrl || "").trim();
+      if (/^https:\/\/\S+$/i.test(base)) {
+        const sep = base.includes("?") ? "&" : "?";
+        return {
+          name: "custom (" + base + ")",
+          jsonUrl: base + sep + "type=TXT&name=", // JSON-API form
+          endpoint: base, // raw endpoint for the RFC 8484 wireformat
+          // Endpoint type is unknown, so try the universal wireformat first.
+          modes: ["wire", "json"]
+        };
       }
-      default:
-        return CLOUDFLARE;
+      return BUILTIN.cloudflare; // invalid/empty custom URL
     }
+    return BUILTIN[s.bimiDohProvider] || BUILTIN.cloudflare;
   }
 
   // TXT lookup over DNS-over-HTTPS, using the configured provider. Returns the
-  // record string (preferring a BIMI1 record), or null. This is what makes BIMI
-  // work on a normal profile, at the cost of sending the queried name to the DoH
+  // record string (preferring a BIMI1 record), or null. Tries the provider's
+  // mode(s) in order — the JSON DoH API where available, the universal RFC 8484
+  // binary wireformat otherwise (and as a fallback). This is what makes BIMI work
+  // on a normal profile, at the cost of sending the queried name to the DoH
   // provider instead of the system resolver.
-  //
-  // The built-in Cloudflare/Google providers use the JSON DoH API. Custom
-  // endpoints try the universal RFC 8484 binary wireformat first (AdGuard, Quad9,
-  // NextDNS, self-hosted resolvers and even Google's /dns-query only speak that),
-  // and fall back to JSON for the rarer JSON-only endpoint.
   async _dnsTxtDoH(host, log) {
     const note = (m) => {
       this._blog(m);
@@ -651,25 +695,20 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     const p = this._dohProvider();
     note("Falling back to DNS-over-HTTPS via " + p.name + " …");
 
-    if (p.custom) {
-      const wire = await this._dohFetchWire(p.endpoint, host, log);
-      if (wire) {
-        note("DoH returned (wireformat): " + wire);
-        return wire;
+    for (const mode of p.modes || ["json"]) {
+      if (mode === "wire" && p.endpoint) {
+        const wire = await this._dohFetchWire(p.endpoint, host, log);
+        if (wire) {
+          note("DoH returned (wireformat): " + wire);
+          return wire;
+        }
+      } else if (mode === "json" && p.jsonUrl) {
+        const json = await this._dohFetchJson(p.jsonUrl + encodeURIComponent(host), log);
+        if (json) {
+          note("DoH returned (JSON): " + json);
+          return json;
+        }
       }
-      note("Wireformat lookup yielded nothing; trying the JSON DoH API …");
-      const json = await this._dohFetchJson(p.url + encodeURIComponent(host), log);
-      if (json) {
-        note("DoH returned (JSON): " + json);
-        return json;
-      }
-      return null;
-    }
-
-    const txt = await this._dohFetchJson(p.url + encodeURIComponent(host), log);
-    if (txt) {
-      note("DoH returned: " + txt);
-      return txt;
     }
     return null;
   }

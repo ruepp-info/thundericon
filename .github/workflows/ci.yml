@@ -1,0 +1,30 @@
+name: CI
+
+# Run the test suite and validate the package on every push and pull request,
+# so breakage is caught before a release is tagged.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test
+        run: |
+          npm ci
+          npm test
+
+      - name: Validate package
+        run: python3 tools/package.py

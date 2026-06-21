@@ -25,6 +25,51 @@ const STYLE_ID = "thundericon-style";
 // for normal use; flip to true to also trace live-list resolution to the console.
 const BIMI_DEBUG = false;
 
+// Built-in DoH resolvers for TXT lookups, keyed by the setting value. Each
+// descriptor is just { name, endpoint }; all lookups use the universal RFC 8484
+// wireformat, which every DoH endpoint understands. Static, so it lives at module
+// scope rather than being rebuilt on every lookup.
+const DOH_PROVIDERS = {
+  // Content-filtering / family-safe resolvers.
+  "adguard-family": {
+    name: "AdGuard DNS (Family Protection)",
+    endpoint: "https://family.adguard-dns.com/dns-query"
+  },
+  "cloudflare-family": {
+    name: "Cloudflare (Family Protection)",
+    endpoint: "https://family.cloudflare-dns.com/dns-query"
+  },
+  "opendns-family": {
+    name: "Cisco Umbrella FamilyShield",
+    endpoint: "https://doh.familyshield.opendns.com/dns-query"
+  },
+  // General-purpose resolvers.
+  adguard: {
+    name: "AdGuard DNS",
+    endpoint: "https://dns.adguard-dns.com/dns-query"
+  },
+  cloudflare: {
+    name: "Cloudflare",
+    endpoint: "https://cloudflare-dns.com/dns-query"
+  },
+  opendns: {
+    name: "Cisco Umbrella (OpenDNS)",
+    endpoint: "https://doh.opendns.com/dns-query"
+  },
+  quad9: {
+    name: "Quad9",
+    endpoint: "https://dns.quad9.net/dns-query"
+  },
+  mullvad: {
+    name: "Mullvad",
+    endpoint: "https://dns.mullvad.net/dns-query"
+  },
+  google: {
+    name: "Google",
+    endpoint: "https://dns.google/dns-query"
+  }
+};
+
 async function readText(url) {
   // Fetch our own packaged resource. `fetch` handles moz-extension URLs in the
   // privileged parent context; fall back to XHR if it is unavailable.
@@ -332,6 +377,17 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     }
   }
 
+  // Build a step logger: writes to the BIMI debug console and, when a log array
+  // is supplied (the "Test BIMI" window), appends the line for the user to see.
+  _noter(log) {
+    return (m) => {
+      this._blog(m);
+      if (log) {
+        log.push(m);
+      }
+    };
+  }
+
   _ensureBimiCore() {
     if (this._bimiLoaded) {
       return;
@@ -343,6 +399,24 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     } catch (e) {
       this._reportError("bimi-core load failed: " + (e && e.message ? e.message : e));
     }
+  }
+
+  // Fold a sender domain to its registrable base when the option is enabled;
+  // returns the (possibly reduced) domain. `note`, if given, is called with
+  // (newBase, originalDomain) only when a reduction actually happens.
+  _baseDomain(domain, settings, note) {
+    const Bimi = globalThis.ThundericonBimi;
+    if (!Bimi || !settings || !settings.bimiBaseDomainOnly) {
+      return domain;
+    }
+    const base = Bimi.baseDomainOf(domain);
+    if (base && base !== domain) {
+      if (note) {
+        note(base, domain);
+      }
+      return base;
+    }
+    return domain;
   }
 
   // Diagnostic resolve used by the options "Test BIMI" window. Runs the real
@@ -385,13 +459,9 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       // Mirror the live list: when base-domain lookup is on, fold subdomains
       // into the registrable domain before querying.
       const settings = (this._config && this._config.settings) || {};
-      if (settings.bimiBaseDomainOnly) {
-        const base = Bimi.baseDomainOf(domain);
-        if (base && base !== domain) {
-          out("Base-domain lookup is on → using: " + base);
-          domain = base;
-        }
-      }
+      domain = this._baseDomain(domain, settings, (base) =>
+        out("Base-domain lookup is on → using: " + base)
+      );
 
       const host = "default._bimi." + domain;
       out("Looking up DNS TXT record: " + host);
@@ -454,13 +524,9 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       }
       // Optionally fold subdomains into the registrable base domain, so the DNS
       // lookup, the TTL'd cache and the persisted entry all key off it.
-      if (settings.bimiBaseDomainOnly) {
-        const base = Bimi.baseDomainOf(domain);
-        if (base && base !== domain) {
-          this._blog(domain, "→ base domain:", base);
-          domain = base;
-        }
-      }
+      domain = this._baseDomain(domain, settings, (base, from) =>
+        this._blog(from, "→ base domain:", base)
+      );
       // DMARC gate: never show a logo for an unauthenticated message.
       const passed = await this._dmarcPass(msgHdr);
       if (!passed) {
@@ -508,207 +574,35 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     return this._fetchSvgDataUrl(rec.logoUrl);
   }
 
-  // Resolve a TXT record. Tries Thunderbird's own DNS service first (honors the
-  // user's system/TRR resolver when it can do TXT), then falls back to
-  // DNS-over-HTTPS. The fallback is required because Gecko's OS resolver only
-  // does A/AAAA lookups — TXT/by-type queries fail with NS_ERROR_UNKNOWN_HOST
-  // unless TRR is enabled, which it usually is not.
-  async _dnsTxt(host, log) {
-    const native = await this._dnsTxtNative(host, log);
-    if (native) {
-      return native;
-    }
-    return this._dnsTxtDoH(host, log);
-  }
-
-  // Attempt via nsIDNSService. Resolves to the joined record string, or null on
-  // any failure. Thunderbird's DNS API has changed shape across versions
-  // (asyncResolve gained a type arg; asyncResolveByType came and went), so we try
-  // the known signatures in turn and accept either listener callback — whichever
-  // the running build actually invokes.
-  _dnsTxtNative(host, log) {
-    const note = (m) => {
-      this._blog(m);
-      if (log) {
-        log.push(m);
-      }
-    };
-    return new Promise((resolve) => {
-      let settled = false;
-      const done = (val) => {
-        if (!settled) {
-          settled = true;
-          resolve(val);
-        }
-      };
-      const handle = (record, status) => {
-        try {
-          if (!Components.isSuccessCode(status) || !record) {
-            note("DNS lookup failed (status=" + status + ")");
-            done(null);
-            return;
-          }
-          const txt = record.QueryInterface(Ci.nsIDNSTXTRecord);
-          const records = txt.getRecords();
-          done(records && records.length ? records.join("") : null);
-        } catch (e) {
-          note("DNS record parse error: " + (e && e.message ? e.message : e));
-          done(null);
-        }
-      };
-      try {
-        const dns = Services.dns;
-        const TXT =
-          (Ci.nsIDNSService && Ci.nsIDNSService.RESOLVE_TYPE_TXT) || 16;
-        const listener = {
-          onLookupComplete(req, record, status) {
-            handle(record, status);
-          },
-          onLookupByTypeComplete(req, record, status) {
-            handle(record, status);
-          }
-        };
-        const target =
-          (Services.tm && (Services.tm.mainThread || Services.tm.mainThreadEventTarget)) ||
-          null;
-        // Try each known signature until one launches without throwing.
-        const attempts = [
-          ["asyncResolve+resolverInfo", () => dns.asyncResolve(host, TXT, 0, null, listener, target, {})],
-          ["asyncResolveByType+resolverInfo", () => dns.asyncResolveByType(host, TXT, 0, null, listener, target, {})],
-          ["asyncResolveByType", () => dns.asyncResolveByType(host, TXT, 0, listener, target, {})],
-          ["asyncResolve", () => dns.asyncResolve(host, TXT, 0, listener, target, {})]
-        ];
-        let launched = "";
-        for (const [name, fn] of attempts) {
-          try {
-            fn();
-            launched = name;
-            break;
-          } catch (e) {
-            /* signature not supported on this build; try the next */
-          }
-        }
-        if (launched) {
-          note("DNS query sent via " + launched);
-        } else {
-          note("DNS: no usable asyncResolve signature on this build");
-          done(null);
-        }
-      } catch (e) {
-        note("DNS error: " + (e && e.message ? e.message : e));
-        done(null);
-      }
-    });
-  }
-
   // The DoH provider to use for TXT, per user settings. Returns a descriptor
-  // { name, jsonUrl?, endpoint?, modes } where `modes` lists the lookup methods
-  // to try in order. Cloudflare/Google expose the JSON API (tried first, with the
-  // wireformat as a fallback); the privacy resolvers (Quad9, Mullvad, AdGuard)
-  // speak only the universal RFC 8484 wireformat. We honor the explicit choice
-  // rather than silently querying a different provider; an invalid/empty custom
-  // URL falls back to Cloudflare so BIMI still works.
+  // from DOH_PROVIDERS, or a descriptor built from the user's custom URL. We
+  // honor the explicit choice rather than silently querying a different provider;
+  // an invalid/empty custom URL falls back to Cloudflare so BIMI still works.
   _dohProvider() {
-    const BUILTIN = {
-      // Content-filtering / family-safe resolvers.
-      "adguard-family": {
-        name: "AdGuard DNS (Family Protection)",
-        endpoint: "https://family.adguard-dns.com/dns-query",
-        modes: ["wire"]
-      },
-      "cloudflare-family": {
-        name: "Cloudflare (Family Protection)",
-        jsonUrl: "https://family.cloudflare-dns.com/dns-query?type=TXT&name=",
-        endpoint: "https://family.cloudflare-dns.com/dns-query",
-        modes: ["json", "wire"]
-      },
-      "opendns-family": {
-        name: "Cisco Umbrella FamilyShield",
-        endpoint: "https://doh.familyshield.opendns.com/dns-query",
-        modes: ["wire"]
-      },
-      // General-purpose resolvers.
-      adguard: {
-        name: "AdGuard DNS",
-        endpoint: "https://dns.adguard-dns.com/dns-query",
-        modes: ["wire"]
-      },
-      cloudflare: {
-        name: "Cloudflare",
-        jsonUrl: "https://cloudflare-dns.com/dns-query?type=TXT&name=",
-        endpoint: "https://cloudflare-dns.com/dns-query",
-        modes: ["json", "wire"]
-      },
-      opendns: {
-        name: "Cisco Umbrella (OpenDNS)",
-        endpoint: "https://doh.opendns.com/dns-query",
-        modes: ["wire"]
-      },
-      quad9: {
-        name: "Quad9",
-        endpoint: "https://dns.quad9.net/dns-query",
-        modes: ["wire"]
-      },
-      mullvad: {
-        name: "Mullvad",
-        endpoint: "https://dns.mullvad.net/dns-query",
-        modes: ["wire"]
-      },
-      google: {
-        name: "Google",
-        jsonUrl: "https://dns.google/resolve?type=TXT&name=",
-        endpoint: "https://dns.google/dns-query",
-        modes: ["json", "wire"]
-      }
-    };
     const s = (this._config && this._config.settings) || {};
     if (s.bimiDohProvider === "custom") {
       const base = String(s.bimiDohCustomUrl || "").trim();
       if (/^https:\/\/\S+$/i.test(base)) {
-        const sep = base.includes("?") ? "&" : "?";
-        return {
-          name: "custom (" + base + ")",
-          jsonUrl: base + sep + "type=TXT&name=", // JSON-API form
-          endpoint: base, // raw endpoint for the RFC 8484 wireformat
-          // Endpoint type is unknown, so try the universal wireformat first.
-          modes: ["wire", "json"]
-        };
+        return { name: "custom (" + base + ")", endpoint: base };
       }
-      return BUILTIN.cloudflare; // invalid/empty custom URL
+      return DOH_PROVIDERS.cloudflare; // invalid/empty custom URL
     }
-    return BUILTIN[s.bimiDohProvider] || BUILTIN.cloudflare;
+    return DOH_PROVIDERS[s.bimiDohProvider] || DOH_PROVIDERS.cloudflare;
   }
 
-  // TXT lookup over DNS-over-HTTPS, using the configured provider. Returns the
-  // record string (preferring a BIMI1 record), or null. Tries the provider's
-  // mode(s) in order — the JSON DoH API where available, the universal RFC 8484
-  // binary wireformat otherwise (and as a fallback). This is what makes BIMI work
-  // on a normal profile, at the cost of sending the queried name to the DoH
-  // provider instead of the system resolver.
-  async _dnsTxtDoH(host, log) {
-    const note = (m) => {
-      this._blog(m);
-      if (log) {
-        log.push(m);
-      }
-    };
+  // Resolve a TXT record purely over DNS-over-HTTPS, using the configured
+  // provider. Returns the record string (preferring a BIMI1 record), or null.
+  // Uses the universal RFC 8484 binary wireformat, which every DoH endpoint
+  // understands. DoH (rather than Gecko's resolver) is required because the OS
+  // resolver only does A/AAAA — TXT queries need TRR/DoH, which it usually lacks.
+  async _dnsTxt(host, log) {
+    const note = this._noter(log);
     const p = this._dohProvider();
-    note("Falling back to DNS-over-HTTPS via " + p.name + " …");
-
-    for (const mode of p.modes || ["json"]) {
-      if (mode === "wire" && p.endpoint) {
-        const wire = await this._dohFetchWire(p.endpoint, host, log);
-        if (wire) {
-          note("DoH returned (wireformat): " + wire);
-          return wire;
-        }
-      } else if (mode === "json" && p.jsonUrl) {
-        const json = await this._dohFetchJson(p.jsonUrl + encodeURIComponent(host), log);
-        if (json) {
-          note("DoH returned (JSON): " + json);
-          return json;
-        }
-      }
+    note("Resolving TXT over DNS-over-HTTPS via " + p.name + " …");
+    const txt = await this._dohFetchWire(p.endpoint, host, log);
+    if (txt) {
+      note("DoH returned: " + txt);
+      return txt;
     }
     return null;
   }
@@ -719,12 +613,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
   // CORS. Resolves to { ok, status, text }. Never rejects.
   _httpGet(url, options) {
     options = options || {};
-    const note = (m) => {
-      this._blog(m);
-      if (options.log) {
-        options.log.push(m);
-      }
-    };
+    const note = this._noter(options.log);
     return new Promise((resolve) => {
       const fail = (msg) => resolve({ ok: false, status: 0, text: "", error: msg });
       try {
@@ -806,53 +695,11 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     });
   }
 
-  // TXT lookup via the JSON DoH API (Cloudflare/Google style).
-  async _dohFetchJson(url, log) {
-    const note = (m) => {
-      this._blog(m);
-      if (log) {
-        log.push(m);
-      }
-    };
-    const Bimi = globalThis.ThundericonBimi;
-    const res = await this._httpGet(url, {
-      headers: { accept: "application/dns-json" }, // Cloudflare needs this for JSON
-      log
-    });
-    if (!res.ok) {
-      note("DoH request failed (" + (res.status || res.error || "?") + ")");
-      return null;
-    }
-    try {
-      const data = JSON.parse(res.text || "{}");
-      const answers = Array.isArray(data.Answer) ? data.Answer : [];
-      const candidates = [];
-      for (const a of answers) {
-        if (a && Number(a.type) === 16) {
-          const s = (Bimi ? Bimi.txtFromDohData(a.data) : String(a.data || "")).trim();
-          if (s) {
-            candidates.push(s);
-          }
-        }
-      }
-      const bimi = candidates.find((c) => /^v\s*=\s*BIMI1/i.test(c));
-      return bimi || candidates[0] || null;
-    } catch (e) {
-      note("DoH parse error: " + (e && e.message ? e.message : e));
-      return null;
-    }
-  }
-
   // TXT lookup via the RFC 8484 DNS-wireformat: a binary query base64url-encoded
   // into the URL's `dns` parameter, with an Accept of application/dns-message.
   // This is the format every standards-compliant DoH endpoint understands.
   async _dohFetchWire(endpoint, host, log) {
-    const note = (m) => {
-      this._blog(m);
-      if (log) {
-        log.push(m);
-      }
-    };
+    const note = this._noter(log);
     const Bimi = globalThis.ThundericonBimi;
     if (!Bimi || !Bimi.encodeDnsTxtQuery) {
       return null;
@@ -893,12 +740,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
   // Fetch a remote SVG (system principal, no CORS) and return a data: URL.
   // Rejects anything that is not a small SVG. Resolves to null on failure.
   async _fetchSvgDataUrl(url, log) {
-    const note = (m) => {
-      this._blog(m);
-      if (log) {
-        log.push(m);
-      }
-    };
+    const note = this._noter(log);
     const res = await this._httpGet(url, { log });
     const text = res.text || "";
     const looksSvg = /<svg[\s>]/i.test(text);

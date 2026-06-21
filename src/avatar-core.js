@@ -99,7 +99,7 @@
     let source = preferEmail ? (email || name) : (name || email);
     source = (source || "").trim();
     if (!source) {
-      return uppercase ? "?" : "?";
+      return "?";
     }
 
     // If the chosen source is an email address, use its local part.

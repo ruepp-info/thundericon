@@ -38,30 +38,6 @@ test("dmarcPassed detects dmarc=pass anywhere in the header", () => {
   assert.equal(B.dmarcPassed(null), false);
 });
 
-test("txtFromDohData strips quotes and joins split character-strings", () => {
-  assert.equal(
-    B.txtFromDohData('"v=BIMI1; l=https://x.io/a.svg"'),
-    "v=BIMI1; l=https://x.io/a.svg"
-  );
-  // A long record split into multiple quoted segments is rejoined.
-  assert.equal(
-    B.txtFromDohData('"v=BIMI1; " "l=https://x.io/a.svg"'),
-    "v=BIMI1; l=https://x.io/a.svg"
-  );
-  // Escaped quotes inside the string are unescaped.
-  assert.equal(B.txtFromDohData('"a\\"b"'), 'a"b');
-  // Unquoted data is returned trimmed; non-strings yield "".
-  assert.equal(B.txtFromDohData("v=BIMI1"), "v=BIMI1");
-  assert.equal(B.txtFromDohData(null), "");
-});
-
-test("a DoH TXT round-trips into parseBimiRecord", () => {
-  const txt = B.txtFromDohData(
-    '"v=BIMI1; l=https://static.ruepp.info/BIMI/sr.svg; a=; avp=personal;"'
-  );
-  assert.equal(B.parseBimiRecord(txt).logoUrl, "https://static.ruepp.info/BIMI/sr.svg");
-});
-
 test("baseDomainOf reduces a subdomain to its registrable domain", () => {
   assert.equal(B.baseDomainOf("trx.mail2.disneyplus.com"), "disneyplus.com");
   assert.equal(B.baseDomainOf("mail.example.com"), "example.com");

@@ -60,25 +60,6 @@
     return /\bdmarc\s*=\s*pass\b/i.test(authResults);
   }
 
-  /**
-   * Turn a DoH JSON Answer's `data` field into a plain TXT string.
-   * DNS-over-HTTPS providers return TXT data as one or more quoted, possibly
-   * escaped, character-strings (e.g. `"\"v=BIMI1; \" \"l=https://…\""`). Strip the
-   * quotes and concatenate the segments back into the original record.
-   */
-  function txtFromDohData(data) {
-    if (typeof data !== "string") {
-      return "";
-    }
-    const segments = data.match(/"((?:[^"\\]|\\.)*)"/g);
-    if (segments && segments.length) {
-      return segments
-        .map((s) => s.slice(1, -1).replace(/\\(.)/g, "$1"))
-        .join("");
-    }
-    return data.trim();
-  }
-
   // A pragmatic (deliberately NOT exhaustive) set of multi-label public
   // suffixes, so baseDomainOf("news.bbc.co.uk") → "bbc.co.uk" rather than the
   // unregistrable "co.uk". The long tail not listed here falls back to the last
@@ -162,9 +143,9 @@
 
   /**
    * Decode the TXT records from a DNS response message (Uint8Array). Each
-   * record's character-strings are concatenated (matching txtFromDohData), so a
-   * split BIMI record comes back whole. Returns an array of strings (possibly
-   * empty); never throws on malformed input.
+   * record's character-strings are concatenated, so a split BIMI record comes
+   * back whole. Returns an array of strings (possibly empty); never throws on
+   * malformed input.
    */
   function decodeDnsTxtAnswers(bytes) {
     const out = [];
@@ -250,7 +231,6 @@
     parseBimiRecord,
     dmarcPassed,
     isFresh,
-    txtFromDohData,
     baseDomainOf,
     encodeDnsTxtQuery,
     decodeDnsTxtAnswers,

@@ -3,7 +3,7 @@
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
   "version": "1.0.28",
-  "author": "Thundericon",
+  "author": "https://github.com/ruepp-info/thundericon",
   "default_locale": "en",
 
   "browser_specific_settings": {

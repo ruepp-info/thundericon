@@ -21,8 +21,10 @@ npm run package       # python3 tools/package.py: validate + zip only (no icons/
 
 There is **no linter** configured. Match the surrounding style (the codebase is heavily commented, explaining the *why*).
 
-### Versioning
-The version string lives in **both** `package.json` and `manifest.json` — keep them in sync when bumping. `options.js` reads the running version from the manifest at runtime.
+The `npm test` script is `node --test test/*.test.js` — an **intentionally unquoted** glob so the POSIX shell expands it (Node only self-expands glob patterns from v21+, and CI runs Node 20). Do **not** change it to `node --test` (auto-discovery) or `node --test test/`: both match `options/bimi-test.js` — the options UI script, whose name fits Node's `*-test.js` discovery pattern — which then throws on load and breaks the run.
+
+### Versioning & releases
+Version is **tag-driven**, so there is no need to hand-bump for a release. `tools/package.py` reads the version only from `manifest.json` and names the artifact `thundericon-<version>.xpi`; `options.js` reads the running version from the manifest at runtime. On a published GitHub Release, `.github/workflows/release.yml` derives the version from the tag (`v1.2.3` or `1.2.3`), injects it into `manifest.json` + `package.json` at build time (**not** committed back), runs `npm ci && npm test`, packages, and uploads the `.xpi` to the release. The committed version strings are therefore dev placeholders — don't rely on them matching releases. `.github/workflows/ci.yml` runs `npm ci && npm test` + `package.py` validation on every push to `main`/`master` and on PRs. The `release` workflow runs from the **default branch's** copy, so its file must be on the default branch for releases to build.
 
 ### Running in Thunderbird
 Use **Tools → Developer Tools → Debug Add-ons → Load Temporary Add-on…** and pick `manifest.json` (not the `.xpi`). This loads enabled and hot-reloads on edit — no rebuild needed. Release Thunderbird disables unsigned permanently-installed add-ons, so the `.xpi` is only for signing/distribution. See `README.md` for full install/verify steps.

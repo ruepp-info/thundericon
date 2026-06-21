@@ -28,8 +28,8 @@
       fontScale: 0.42, // initials font-size as a fraction of badge size
 
       // Badge geometry
-      badgeSize: 24, // px (Table view); Cards view scales up via CSS
-      borderRadius: 50, // percent (50 = circle, 0 = square)
+      badgeSize: 30, // px (Table view); Cards view scales up via CSS
+      borderRadius: 25, // percent (50 = circle, 0 = square)
 
       // Initials derivation
       initialsCount: 2, // 1 or 2
@@ -41,7 +41,7 @@
       // Look up the logo on the sender's registrable ("base") domain instead of
       // the exact From domain, e.g. resolve test@trx.mail2.disneyplus.com against
       // disneyplus.com. Lets a brand's subdomains share one published logo.
-      bimiBaseDomainOnly: false,
+      bimiBaseDomainOnly: true,
       // TXT lookups use Thunderbird's resolver first, then DNS-over-HTTPS (the
       // OS resolver can't do TXT). Which DoH provider to use for that fallback:
       bimiDohProvider: "cloudflare", // cloudflare | google | custom

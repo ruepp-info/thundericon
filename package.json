@@ -2,6 +2,7 @@
   "name": "thundericon",
   "version": "0.0.0",
   "private": true,
+  "license": "MPL-2.0",
   "description": "Minimalist sender-initial avatars for the Thunderbird message list.",
   "scripts": {
     "build": "./build.sh",

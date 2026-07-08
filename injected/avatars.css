@@ -111,3 +111,41 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   height: 100%;
   object-fit: cover;
 }
+
+/* Unread emphasis (Cards layout only).
+ *
+ * Thunderbird's default unread cue (bold text) is easy to miss, especially in
+ * dark mode. The renderer tags each card avatar with .ti-avatar--unread or
+ * .ti-avatar--read (read state from the message header) and sets the accent
+ * color + which cues to show as space-separated tokens on the document root:
+ * :root[data-ti-unread-style] (e.g. "bar fade"). Every rule below gates on a
+ * token, so nothing applies when the renderer clears the attribute (feature off,
+ * or state unknown → the badge gets neither marker class). Scoped to
+ * tr[is="thread-card"] so the Table layout is never touched. */
+
+/* Accent bar on the leading edge of an unread card. The cell already has
+ * position:relative (from the .ti-avatar--card rule above) and spans the row, so
+ * the bar sits at the row's leading edge, left of the inset avatar. */
+:root[data-ti-unread-style~="bar"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread)::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--ti-unread-accent, #4aa9ff);
+  pointer-events: none;
+}
+
+/* Fade read messages so unread ones pop (applies to initials and photos). */
+:root[data-ti-unread-style~="fade"]
+  tr[is="thread-card"] .ti-avatar--read {
+  opacity: 0.4;
+  filter: grayscale(0.5);
+}
+
+/* Ring/halo around an unread avatar (box-shadow isn't clipped by overflow). */
+:root[data-ti-unread-style~="ring"]
+  tr[is="thread-card"] .ti-avatar--unread {
+  box-shadow: 0 0 0 2px var(--ti-unread-accent, #4aa9ff);
+}

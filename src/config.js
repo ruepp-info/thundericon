@@ -35,6 +35,15 @@
       initialsCount: 2, // 1 or 2
       initialsSource: "displayName", // displayName | email
 
+      // Unread emphasis (Cards layout only) — make new/unread mail stand out
+      // more strongly than Thunderbird's default bold, which is hard to see in
+      // dark mode. Pure local styling (no network/privacy cost), so it's on by
+      // default. `unreadStyle` selects the cues: an accent bar on the leading
+      // edge of unread cards and/or fading read messages' avatars.
+      unreadEmphasis: true,
+      unreadStyle: "barFade", // barFade | bar | ring | fade
+      unreadAccentColor: "#4aa9ff", // bar/ring color; bright azure, pops on dark
+
       // BIMI (Brand Indicators for Message Identification) — opt-in.
       bimiEnabled: false,
       bimiRefreshHours: 168, // 1 week (logos change rarely, like Gravatars)

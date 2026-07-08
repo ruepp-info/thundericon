@@ -93,6 +93,10 @@ function populate() {
   $("colorMode").value = s.colorMode;
   $("fixedColor").value = Core.normalizeHex(s.fixedColor) || "#6b7280";
 
+  $("unreadEmphasis").checked = s.unreadEmphasis !== false;
+  $("unreadStyle").value = s.unreadStyle || "barFade";
+  $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
+
   $("bimiEnabled").checked = s.bimiEnabled === true;
   $("bimiBaseDomainOnly").checked = s.bimiBaseDomainOnly === true;
   $("bimiRefreshHours").value = String(s.bimiRefreshHours || 168);
@@ -122,7 +126,9 @@ function wire() {
   const scalars = [
     "enabled", "layoutTable", "layoutCards", "badgeSize", "borderRadius",
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
-    "uppercase", "colorMode", "fixedColor", "bimiEnabled", "bimiBaseDomainOnly",
+    "uppercase", "colorMode", "fixedColor",
+    "unreadEmphasis", "unreadStyle", "unreadAccentColor",
+    "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
     "gravatarEnabled", "gravatarRefreshHours"
   ];
@@ -248,6 +254,9 @@ function collectScalars() {
   s.uppercase = $("uppercase").checked;
   s.colorMode = $("colorMode").value;
   s.fixedColor = $("fixedColor").value;
+  s.unreadEmphasis = $("unreadEmphasis").checked;
+  s.unreadStyle = $("unreadStyle").value;
+  s.unreadAccentColor = $("unreadAccentColor").value;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
   s.bimiRefreshHours = parseInt($("bimiRefreshHours").value, 10) || 168;
@@ -427,10 +436,21 @@ function sideEffects() {
   $("paletteGroup").hidden = state.settings.colorMode !== "customPalette";
 
   updateEnabledState();
+  updateUnreadState();
   updateBimiState();
   updateGravatarState();
   applyRootVars();
   renderPreview();
+}
+
+// The style select and accent color only matter when unread emphasis is on. The
+// accent color is hidden for the "fade" style, which uses no accent color.
+function updateUnreadState() {
+  const on = $("unreadEmphasis").checked;
+  $("unreadStyle").disabled = !on;
+  $("unreadAccentColor").disabled = !on || $("unreadStyle").value === "fade";
+  $("unreadGroup").classList.toggle("disabled", !on);
+  $("unreadColorGroup").hidden = $("unreadStyle").value === "fade";
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them

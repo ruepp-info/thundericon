@@ -57,6 +57,8 @@ options.js writes storage.local
 ### Renderer performance contract (`injected/avatar-renderer.js`)
 Runs inside `about:3pane`. Keeps the main thread free via: a single `MutationObserver` on the virtualized thread tbody; mutations coalesced and processed in idle, time-sliced batches; recycled rows tracked in a `WeakMap` keyed by a render signature so unchanged rows are skipped; decoration is idempotent. All geometry/typography comes from CSS custom properties set once on the document root (`--ti-*` in `injected/avatars.css`); only per-sender color is written per badge.
 
+**Unread emphasis** (Cards layout only): `decorate` reads `hdr.isRead` synchronously (no host bridge), tags the card badge `ti-avatar--unread`/`ti-avatar--read` (never both; unknown/scraped rows get neither), and folds the read state into the render signature so a mark-as-read flip repaints. `applyConfig` writes the accent color (`--ti-unread-accent`) and which cues to show as space-separated tokens on `:root[data-ti-unread-style]` (e.g. `"bar fade"`); the CSS rules gate on those tokens and are scoped to `tr[is="thread-card"]`, so Table view is untouched. Live update relies on TB rewriting the card's bold text (a `characterData`/`childList` mutation) on mark-read; if a future TB flips read state via a class-only change, add a scoped `attributeFilter` to the observer.
+
 ### BIMI resolution pipeline
 BIMI = a brand logo published in a DNS TXT record at `default._bimi.<domain>`, shown only for DMARC-passing mail. Split across renderer (`avatar-renderer.js`) and host (`api/threadpane/implementation.js`):
 

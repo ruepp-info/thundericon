@@ -17,6 +17,11 @@ tree, in both **Table** and **Cards** layouts, without blocking the main thread.
   and unchanged rows are skipped — decoration is idempotent.
 - **Both list layouts.** Compact inline badge in Table view; larger left-floated
   badge in Cards view.
+- **Stronger unread indicator (Cards view).** Makes new/unread mail pop far more
+  than Thunderbird's default bold — an Outlook/eM Client-style accent bar on the
+  leading edge of unread cards and/or fading read messages' avatars, in a color
+  you choose. Especially helpful in dark mode. On by default; pick the style
+  (bar + fade / bar / ring / fade) in Options. Applies to the Cards layout only.
 - **Configurable color logic:** muted neutral palette (default), grayscale, soft
   low-saturation hue, vibrant HSL hash, a single fixed color, or your own custom
   palette. Per-sender colors are stable across sessions (deterministic hash).
@@ -129,6 +134,7 @@ npm test      # node --test  (61 tests)
   `about:3pane`: badge rendering, **no duplicates**, **virtualized-row recycling**,
   idempotency, layout toggles, BIMI/Gravatar image swap-in, **Gravatar-over-BIMI
   precedence**, the DMARC gate, folder skipping, the `gDBView` scraping fallback,
+  **unread-emphasis marker classes (Cards only) + live read/unread flip**,
   enable/disable, and clean `destroy()`.
 
 > These cover the pure modules and ~the whole renderer. The privileged experiment
@@ -142,6 +148,10 @@ npm test      # node --test  (61 tests)
 - Scroll a large folder fast → no jank, no duplicate/stale badges.
 - **Options** → change color mode / font / size / radius, add a `domain → color`
   mapping → the open list updates without restart.
+- **Cards view + dark theme** → unread messages show the accent bar / full-color
+  avatar while read ones fade. Mark a message read → the bar/fade updates live.
+  **Options → Unread messages** → toggle it, cycle the style, change the accent
+  color; the list reflects each change without a restart.
 - **Options → Profile photos (Gravatar)** → enable, then open a folder with a
   sender who has a Gravatar → their photo replaces the initials. Use **Test
   Gravatar…** with a known address to confirm the hash/fetch path.

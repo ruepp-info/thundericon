@@ -44,13 +44,15 @@ function setup() {
 
   const authors = [];
   const folderFlags = [];
+  const readStates = []; // per-index isRead (boolean) or undefined = unknown
   window.gDBView = {
     getMsgHdrAt(i) {
       return authors[i] != null
         ? {
             mime2DecodedAuthor: authors[i],
             messageId: "msg-" + i + "@test",
-            folder: { flags: folderFlags[i] || 0 }
+            folder: { flags: folderFlags[i] || 0 },
+            isRead: readStates[i]
           }
         : null;
     }
@@ -59,7 +61,7 @@ function setup() {
   window.eval(CORE);
   window.eval(RENDERER);
 
-  return { window, doc, tbody, authors, folderFlags };
+  return { window, doc, tbody, authors, folderFlags, readStates };
 }
 
 function addRow(doc, { index, kind = "row", text = "loading" }) {
@@ -262,6 +264,110 @@ test("disabling via config removes all badges; re-enabling restores them", async
   window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
   await waitFor(() => badges(tbody).length === 1);
   assert.equal(badges(tbody).length, 1, "restored when re-enabled");
+});
+
+/* ---- unread emphasis (Cards layout) ----------------------------------- */
+
+// DEFAULT_CONFIG omits the unread keys, so the renderer's `!== false` default
+// leaves emphasis ON — enough for the marker-class tests below.
+
+test("card badges get ti-avatar--unread / --read from the header read state", async () => {
+  const { window, doc, tbody, authors, readStates } = setup();
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
+
+  authors[0] = "Unread Person <u@x.org>";
+  readStates[0] = false;
+  authors[1] = "Read Person <r@x.org>";
+  readStates[1] = true;
+  const unreadCard = addRow(doc, { index: 0, kind: "card" });
+  const readCard = addRow(doc, { index: 1, kind: "card" });
+  tbody.append(unreadCard, readCard);
+
+  await waitFor(() => badges(tbody).length === 2);
+  const ub = unreadCard.querySelector(".ti-avatar");
+  const rb = readCard.querySelector(".ti-avatar");
+  assert.ok(ub.classList.contains("ti-avatar--unread"));
+  assert.ok(!ub.classList.contains("ti-avatar--read"));
+  assert.ok(rb.classList.contains("ti-avatar--read"));
+  assert.ok(!rb.classList.contains("ti-avatar--unread"));
+});
+
+test("table rows never get the unread/read marker classes (Cards only)", async () => {
+  const { window, doc, tbody, authors, readStates } = setup();
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
+
+  authors[0] = "Unread Row <u@x.org>";
+  readStates[0] = false;
+  const row = addRow(doc, { index: 0, kind: "row" });
+  tbody.appendChild(row);
+
+  await waitFor(() => row.querySelector(".ti-avatar"));
+  const b = row.querySelector(".ti-avatar");
+  assert.ok(!b.classList.contains("ti-avatar--unread"));
+  assert.ok(!b.classList.contains("ti-avatar--read"));
+});
+
+test("marking a card read swaps --unread for --read on the same badge", async () => {
+  const { window, doc, tbody, authors, readStates } = setup();
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
+
+  authors[0] = "Person <p@x.org>";
+  readStates[0] = false;
+  const card = addRow(doc, { index: 0, kind: "card", text: "Person" });
+  tbody.appendChild(card);
+  await waitFor(() => {
+    const b = card.querySelector(".ti-avatar");
+    return b && b.classList.contains("ti-avatar--unread");
+  });
+  const before = card.querySelector(".ti-avatar");
+
+  // Mark read: flip the header bit and rewrite the card text the way Thunderbird
+  // repaints a row on read (fires a childList mutation → re-decoration).
+  readStates[0] = true;
+  card.querySelector(".card-layout").textContent = "Person";
+
+  await waitFor(() => {
+    const b = card.querySelector(".ti-avatar");
+    return b && b.classList.contains("ti-avatar--read");
+  });
+  const after = card.querySelector(".ti-avatar");
+  assert.equal(after, before, "same badge node reused");
+  assert.ok(!after.classList.contains("ti-avatar--unread"));
+  assert.equal(card.querySelectorAll(".ti-avatar").length, 1);
+});
+
+test("unreadEmphasis:false adds no marker classes and clears the root style token", async () => {
+  const { window, doc, tbody, authors, readStates } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.unreadEmphasis = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  authors[0] = "Person <p@x.org>";
+  readStates[0] = false;
+  const card = addRow(doc, { index: 0, kind: "card" });
+  tbody.appendChild(card);
+
+  await waitFor(() => card.querySelector(".ti-avatar"));
+  await settle();
+  const b = card.querySelector(".ti-avatar");
+  assert.ok(!b.classList.contains("ti-avatar--unread"));
+  assert.ok(!b.classList.contains("ti-avatar--read"));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, undefined);
+});
+
+test("applyConfig sets the accent color and style tokens on the root", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.unreadEmphasis = true;
+  cfg.settings.unreadStyle = "barFade";
+  cfg.settings.unreadAccentColor = "#123456";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, "bar fade");
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-unread-accent"), "#123456");
+
+  cfg.settings.unreadStyle = "ring";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, "ring");
 });
 
 /* ---- BIMI logo branch ------------------------------------------------- */

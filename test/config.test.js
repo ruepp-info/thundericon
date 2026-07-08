@@ -74,6 +74,25 @@ test("mergeSettings merges the layouts sub-object", () => {
   assert.equal(m.settings.layouts.table, true); // default preserved
 });
 
+test("unread-emphasis defaults exist", () => {
+  const s = Cfg.DEFAULTS.settings;
+  assert.equal(s.unreadEmphasis, true);
+  assert.equal(s.unreadStyle, "barFade");
+  assert.equal(s.unreadAccentColor, "#4aa9ff");
+});
+
+test("unread-emphasis defaults survive a partial stored settings (existing profiles)", () => {
+  // A profile saved before this feature existed won't have the keys; the defaults
+  // must still surface so the feature is available on upgrade.
+  const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
+  assert.equal(m.settings.unreadEmphasis, true);
+  assert.equal(m.settings.unreadStyle, "barFade");
+  assert.equal(m.settings.unreadAccentColor, "#4aa9ff");
+  // an explicit override still wins
+  const m2 = Cfg.mergeSettings({ settings: { unreadStyle: "ring" } });
+  assert.equal(m2.settings.unreadStyle, "ring");
+});
+
 test("subscribe() fires with a merged config on change", async () => {
   const got = await new Promise((resolve) => {
     const unsub = Cfg.subscribe((cfg) => {

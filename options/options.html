@@ -119,6 +119,40 @@
         </div>
       </section>
 
+      <!-- Unread emphasis (Cards layout) -->
+      <section class="card span2">
+        <h2>Unread messages (Cards view)</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="unreadEmphasis" />
+          <span>Emphasize new / unread mail</span>
+        </label>
+        <p class="hint">
+          Make unread messages stand out more than Thunderbird's default bold
+          text — much easier to scan in dark mode. Applies to the
+          <strong>Cards</strong> layout only; the Table layout is left unchanged.
+        </p>
+
+        <div class="subgroup" id="unreadGroup">
+          <label class="row">
+            <span>Style</span>
+            <select id="unreadStyle">
+              <option value="barFade">Accent bar + fade read (recommended)</option>
+              <option value="bar">Accent bar only</option>
+              <option value="ring">Ring around unread avatar</option>
+              <option value="fade">Fade read messages</option>
+            </select>
+          </label>
+          <div class="row stack conditional" id="unreadColorGroup">
+            <span>Accent color</span>
+            <input type="color" id="unreadAccentColor" />
+          </div>
+          <p class="hint">
+            The accent color is used for the bar and the ring; the
+            <em>Fade read</em> style doesn't use it.
+          </p>
+        </div>
+      </section>
+
       <!-- Domain overrides -->
       <section class="card span2">
         <h2>Domain colors</h2>

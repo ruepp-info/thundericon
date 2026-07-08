@@ -47,6 +47,7 @@
   let pending = new Set(); // rows queued for (re)decoration
   let flushScheduled = false;
   let enabled = true; // gates all decoration; flipped by config
+  let unreadOn = false; // unread-emphasis feature (Cards layout); set by config
 
   // BIMI: resolution is async and gated per-message by DMARC (a domain may have a
   // logo, yet a spoofed message from it must still show initials). So results are
@@ -230,6 +231,15 @@
     const author = authorFrom(hdr, row);
     const desc = Core.describe(author, settings, domainColors);
 
+    // Unread emphasis (Cards layout only). Read state comes straight off the
+    // header; when it's unknown (gDBView unavailable → scraped fallback) we mark
+    // neither, so a message is never mislabeled read/unread. `stateTag` folds
+    // into the recycle signature below so a read<->unread flip repaints the row.
+    const knownRead = hdr && typeof hdr.isRead === "boolean";
+    const unread = layout === "card" && unreadOn && knownRead && hdr.isRead === false;
+    const read = layout === "card" && unreadOn && knownRead && hdr.isRead === true;
+    const stateTag = unreadOn ? (unread ? "|U" : read ? "|R" : "|?") : "";
+
     // Gravatar / BIMI are active for this row unless its folder is excluded
     // (own/untrusted mail like Sent, Drafts or Junk).
     const gravatarOn = gravatarEnabled && !folderSkipped(hdr, settings.gravatarSkipFolders);
@@ -252,7 +262,7 @@
     // Signature folds in which image we render, so an async image arriving
     // (initials -> photo/logo) still triggers a re-render on the recycled-row
     // fast path, as does a photo superseding a logo.
-    const sig = desc.key + (img ? (kind === "photo" ? "|G" : "|B") : "|I");
+    const sig = desc.key + (img ? (kind === "photo" ? "|G" : "|B") : "|I") + stateTag;
     if (rowKeys.get(row) === sig && existing) {
       return; // recycled row, identical render — nothing to do
     }
@@ -270,6 +280,13 @@
     } else {
       renderInitials(badge, desc, author);
     }
+
+    // Read/unread marker classes (Cards only). CSS in avatars.css keys off these
+    // plus the root `data-ti-unread-style` tokens; toggling false removes them, so
+    // disabling the feature (a config push resets rowKeys → re-decorates all rows)
+    // strips them cleanly.
+    badge.classList.toggle("ti-avatar--unread", unread);
+    badge.classList.toggle("ti-avatar--read", read);
 
     // Not yet resolved → ask the privileged host. Both run in parallel; negative
     // results are cached, so this converges (and stays cheap) once all are known.
@@ -529,8 +546,17 @@
     "--ti-font",
     "--ti-weight",
     "--ti-fontscale",
-    "--ti-transform"
+    "--ti-transform",
+    "--ti-unread-accent"
   ];
+
+  // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
+  const UNREAD_STYLE_TOKENS = {
+    barFade: "bar fade",
+    bar: "bar",
+    ring: "ring",
+    fade: "fade"
+  };
 
   function applyConfig(cfg) {
     cfg = cfg || {};
@@ -550,6 +576,17 @@
       "--ti-transform",
       settings.uppercase === false ? "none" : "uppercase"
     );
+
+    // Unread emphasis (Cards layout). The accent color drives the bar/ring; the
+    // style tokens on the root gate which cues the CSS applies (empty when off).
+    unreadOn = settings.unreadEmphasis !== false;
+    rootStyle.setProperty("--ti-unread-accent", settings.unreadAccentColor || "#4aa9ff");
+    const styleTokens = UNREAD_STYLE_TOKENS[settings.unreadStyle] || UNREAD_STYLE_TOKENS.barFade;
+    if (unreadOn) {
+      doc.documentElement.dataset.tiUnreadStyle = styleTokens;
+    } else {
+      delete doc.documentElement.dataset.tiUnreadStyle;
+    }
 
     // Force a full recompute: color mode / initials may have changed.
     rowKeys = new WeakMap();
@@ -601,6 +638,7 @@
         for (const v of ROOT_VARS) {
           rootStyle.removeProperty(v);
         }
+        delete doc.documentElement.dataset.tiUnreadStyle;
         rowKeys = new WeakMap();
         pending = new Set();
         bimiByMsg = new Map();

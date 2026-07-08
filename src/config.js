@@ -43,6 +43,7 @@
       unreadEmphasis: true,
       unreadStyle: "bar", // barFade | bar | ring | fade
       unreadAccentColor: "#4aa9ff", // bar/ring color; bright azure, pops on dark
+      unreadBarWidth: "medium", // narrow | medium | wide (accent bar thickness)
 
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so

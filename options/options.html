@@ -171,9 +171,17 @@
             <span>Accent color</span>
             <input type="color" id="unreadAccentColor" />
           </div>
+          <label class="row conditional" id="unreadWidthGroup">
+            <span>Accent bar width</span>
+            <select id="unreadBarWidth">
+              <option value="narrow">Narrow</option>
+              <option value="medium">Medium (recommended)</option>
+              <option value="wide">Wide</option>
+            </select>
+          </label>
           <p class="hint">
-            The accent color is used for the bar and the ring; the
-            <em>Fade read</em> style doesn't use it.
+            The accent color is used for the bar and the ring; the width sets the
+            bar's thickness. The <em>Fade read</em> style uses neither.
           </p>
         </div>
       </section>

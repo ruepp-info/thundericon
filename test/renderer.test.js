@@ -361,9 +361,11 @@ test("applyConfig sets the accent color and style tokens on the root", async () 
   cfg.settings.unreadEmphasis = true;
   cfg.settings.unreadStyle = "barFade";
   cfg.settings.unreadAccentColor = "#123456";
+  cfg.settings.unreadBarWidth = "wide";
   window.__thundericon.apply(JSON.stringify(cfg));
   assert.equal(doc.documentElement.dataset.tiUnreadStyle, "bar fade");
   assert.equal(doc.documentElement.style.getPropertyValue("--ti-unread-accent"), "#123456");
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-unread-bar-width"), "6px");
 
   cfg.settings.unreadStyle = "ring";
   window.__thundericon.apply(JSON.stringify(cfg));

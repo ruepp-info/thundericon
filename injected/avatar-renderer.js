@@ -547,7 +547,8 @@
     "--ti-weight",
     "--ti-fontscale",
     "--ti-transform",
-    "--ti-unread-accent"
+    "--ti-unread-accent",
+    "--ti-unread-bar-width"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -557,6 +558,9 @@
     ring: "ring",
     fade: "fade"
   };
+
+  // unreadBarWidth -> accent-bar thickness in px.
+  const UNREAD_BAR_WIDTHS = { narrow: "2px", medium: "4px", wide: "6px" };
 
   function applyConfig(cfg) {
     cfg = cfg || {};
@@ -581,6 +585,10 @@
     // style tokens on the root gate which cues the CSS applies (empty when off).
     unreadOn = settings.unreadEmphasis !== false;
     rootStyle.setProperty("--ti-unread-accent", settings.unreadAccentColor || "#4aa9ff");
+    rootStyle.setProperty(
+      "--ti-unread-bar-width",
+      UNREAD_BAR_WIDTHS[settings.unreadBarWidth] || UNREAD_BAR_WIDTHS.medium
+    );
     const styleTokens = UNREAD_STYLE_TOKENS[settings.unreadStyle] || UNREAD_STYLE_TOKENS.barFade;
     if (unreadOn) {
       doc.documentElement.dataset.tiUnreadStyle = styleTokens;

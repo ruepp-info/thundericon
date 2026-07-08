@@ -18,6 +18,9 @@ const UNREAD_STYLE_TOKENS = {
   fade: "fade"
 };
 
+// unreadBarWidth -> accent-bar thickness in px (mirrors the renderer).
+const UNREAD_BAR_WIDTHS = { narrow: "2px", medium: "4px", wide: "6px" };
+
 const SAMPLES = [
   "Ada Lovelace <ada@analytical.org>",
   "Grace Hopper <grace@navy.mil>",
@@ -148,6 +151,7 @@ function populate() {
   $("unreadEmphasis").checked = s.unreadEmphasis !== false;
   $("unreadStyle").value = s.unreadStyle || "bar";
   $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
+  $("unreadBarWidth").value = s.unreadBarWidth || "medium";
 
   $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
 
@@ -181,7 +185,7 @@ function wire() {
     "enabled", "layoutTable", "layoutCards", "badgeSize", "borderRadius",
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor",
-    "unreadEmphasis", "unreadStyle", "unreadAccentColor",
+    "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "attachmentsAutoExpand",
     "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
@@ -312,6 +316,7 @@ function collectScalars() {
   s.unreadEmphasis = $("unreadEmphasis").checked;
   s.unreadStyle = $("unreadStyle").value;
   s.unreadAccentColor = $("unreadAccentColor").value;
+  s.unreadBarWidth = $("unreadBarWidth").value;
   s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
@@ -503,10 +508,14 @@ function sideEffects() {
 // accent color is hidden for the "fade" style, which uses no accent color.
 function updateUnreadState() {
   const on = $("unreadEmphasis").checked;
+  const style = $("unreadStyle").value;
+  const hasBar = style === "bar" || style === "barFade";
   $("unreadStyle").disabled = !on;
-  $("unreadAccentColor").disabled = !on || $("unreadStyle").value === "fade";
+  $("unreadAccentColor").disabled = !on || style === "fade";
+  $("unreadBarWidth").disabled = !on || !hasBar;
   $("unreadGroup").classList.toggle("disabled", !on);
-  $("unreadColorGroup").hidden = $("unreadStyle").value === "fade";
+  $("unreadColorGroup").hidden = style === "fade";
+  $("unreadWidthGroup").hidden = !hasBar; // width only applies to the bar
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them
@@ -561,6 +570,10 @@ function applyRootVars() {
   // Mirror the Cards-view unread emphasis onto the root so the preview shows it
   // (the preview reuses the same accent color + cue tokens as the renderer).
   root.setProperty("--ti-unread-accent", Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff");
+  root.setProperty(
+    "--ti-unread-bar-width",
+    UNREAD_BAR_WIDTHS[s.unreadBarWidth] || UNREAD_BAR_WIDTHS.medium
+  );
   if (s.unreadEmphasis !== false) {
     document.documentElement.dataset.tiUnreadStyle =
       UNREAD_STYLE_TOKENS[s.unreadStyle] || UNREAD_STYLE_TOKENS.bar;

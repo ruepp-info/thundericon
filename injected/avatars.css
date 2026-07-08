@@ -132,7 +132,7 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  width: 3px;
+  width: var(--ti-unread-bar-width, 4px);
   background: var(--ti-unread-accent, #4aa9ff);
   pointer-events: none;
 }

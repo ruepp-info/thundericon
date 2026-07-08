@@ -24,7 +24,7 @@ const UNREAD_STYLE_TOKENS = {
 const UNREAD_BAR_WIDTHS = { narrow: "2px", medium: "4px", wide: "6px" };
 
 // Build a CSS `content` value from the configured glyph (mirrors the renderer):
-// first code point, escaped for a double-quoted CSS string, bullet when empty.
+// the single character, escaped for a double-quoted CSS string, bullet when empty.
 function glyphContent(raw) {
   const ch = Array.from(String(raw == null ? "" : raw))[0] || "";
   if (!ch) {

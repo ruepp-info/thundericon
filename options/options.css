@@ -238,7 +238,9 @@ output {
   align-items: center;
   gap: 8px;
   min-width: 200px;
-  padding-inline-start: 12px;
+  /* Reserve the same dot/character gutter the message list uses (from avatars.css,
+     linked here) so the marker never overlaps the sample badge. */
+  padding-inline-start: calc(12px + var(--ti-unread-marker-space, 0px));
 }
 
 .preview .name {
@@ -270,10 +272,10 @@ output {
   content: "";
   position: absolute;
   top: 50%;
-  inset-inline-start: 0;
+  inset-inline-start: calc((12px + var(--ti-unread-marker-space, 0px)) / 2);
   width: 8px;
   height: 8px;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--ti-unread-accent, #4aa9ff);
   pointer-events: none;
@@ -283,8 +285,8 @@ output {
   content: var(--ti-unread-glyph, "\2022");
   position: absolute;
   top: 50%;
-  inset-inline-start: 0;
-  transform: translateY(-50%);
+  inset-inline-start: calc((12px + var(--ti-unread-marker-space, 0px)) / 2);
+  transform: translate(-50%, -50%);
   color: var(--ti-unread-accent, #4aa9ff);
   font-family: var(--ti-unread-glyph-font, inherit);
   font-size: var(--ti-unread-glyph-size, 14px);

@@ -568,9 +568,9 @@
   // unreadBarWidth -> accent-bar thickness in px.
   const UNREAD_BAR_WIDTHS = { narrow: "2px", medium: "4px", wide: "6px" };
 
-  // Build a CSS `content` value (a quoted string) from the configured glyph: take
-  // the first code point (so an emoji works), escape it for a double-quoted CSS
-  // string, and fall back to a bullet when empty.
+  // Build a CSS `content` value (a quoted string) from the configured glyph. The
+  // input is limited to a single character; take the first just in case, escape it
+  // for a double-quoted CSS string, and fall back to a bullet when empty.
   function glyphContent(raw) {
     const ch = Array.from(String(raw == null ? "" : raw))[0] || "";
     if (!ch) {

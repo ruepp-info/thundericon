@@ -72,13 +72,13 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) {
 }
 
 tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
-  margin-inline-start: calc(var(--ti-size, 24px) * 1.7 + 16px);
+  margin-inline-start: calc(var(--ti-size, 24px) * 1.7 + 16px + var(--ti-unread-marker-space, 0px));
 }
 
 .ti-avatar--card {
   --_ti-size: calc(var(--ti-size, 24px) * 1.7);
   position: absolute;
-  inset-inline-start: 8px;
+  inset-inline-start: calc(8px + var(--ti-unread-marker-space, 0px));
   top: 50%;
   transform: translateY(-50%);
   margin: 0;
@@ -123,6 +123,20 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
  * or state unknown → the badge gets neither marker class). Scoped to
  * tr[is="thread-card"] so the Table layout is never touched. */
 
+/* The dot / character markers sit in the leading gutter, where they would collide
+ * with the inset avatar (which paints on top and hides them). Reserve a gutter for
+ * them via --ti-unread-marker-space, consumed by .ti-avatar--card's inset and the
+ * content indent above. It is set on :root, so it shifts EVERY card's avatar (read
+ * and unread) by the same amount — the avatars stay column-aligned; only the
+ * unread rows actually draw a marker in the reserved space. The bar/ring/fade
+ * styles reserve nothing (the var stays unset → the 0px fallback). The dot and the
+ * character reserve the same gutter; each marker is then centred (H and V) in the
+ * free space from the leading edge to the avatar (see their rules below). */
+:root[data-ti-unread-style~="dot"],
+:root[data-ti-unread-style~="glyph"] {
+  --ti-unread-marker-space: 10px;
+}
+
 /* Accent bar on the leading edge of an unread card. The cell already has
  * position:relative (from the .ti-avatar--card rule above) and spans the row, so
  * the bar sits at the row's leading edge, left of the inset avatar. */
@@ -145,10 +159,11 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   content: "";
   position: absolute;
   top: 50%;
-  inset-inline-start: 2px;
+  /* centre of the free space between the leading edge and the avatar */
+  inset-inline-start: calc((8px + var(--ti-unread-marker-space, 0px)) / 2);
   width: 8px;
   height: 8px;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--ti-unread-accent, #4aa9ff);
   pointer-events: none;
@@ -162,8 +177,10 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   content: var(--ti-unread-glyph, "\2022");
   position: absolute;
   top: 50%;
-  inset-inline-start: 2px;
-  transform: translateY(-50%);
+  /* centre of the free space between the leading edge and the avatar; the box
+     shrinks to the character, so translate(-50%) centres it whatever its width */
+  inset-inline-start: calc((8px + var(--ti-unread-marker-space, 0px)) / 2);
+  transform: translate(-50%, -50%);
   color: var(--ti-unread-accent, #4aa9ff);
   font-family: var(--ti-unread-glyph-font, inherit);
   font-size: var(--ti-unread-glyph-size, 14px);

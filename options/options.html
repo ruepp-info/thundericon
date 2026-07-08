@@ -26,6 +26,8 @@
               aria-controls="panel-general" aria-selected="true">General</button>
       <button type="button" class="tab" role="tab" id="tab-unread"
               aria-controls="panel-unread" aria-selected="false" tabindex="-1">Unread</button>
+      <button type="button" class="tab" role="tab" id="tab-attachments"
+              aria-controls="panel-attachments" aria-selected="false" tabindex="-1">Attachments</button>
       <button type="button" class="tab" role="tab" id="tab-bimi"
               aria-controls="panel-bimi" aria-selected="false" tabindex="-1">Brand logos</button>
       <button type="button" class="tab" role="tab" id="tab-gravatar"
@@ -174,6 +176,23 @@
             <em>Fade read</em> style doesn't use it.
           </p>
         </div>
+      </section>
+    </div>
+
+    <!-- Attachments -->
+    <div class="grid panel" id="panel-attachments" role="tabpanel" aria-labelledby="tab-attachments" hidden>
+      <section class="card span2">
+        <h2>Attachments</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="attachmentsAutoExpand" />
+          <span>Always show the attachment list</span>
+        </label>
+        <p class="hint">
+          When a message has attachments, expand the attachment list in the message
+          header automatically, so you see them without having to click to expand.
+          Applies to the message you're reading (preview pane, message tab or
+          window).
+        </p>
       </section>
     </div>
 

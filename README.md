@@ -22,6 +22,10 @@ tree, in both **Table** and **Cards** layouts, without blocking the main thread.
   leading edge of unread cards and/or fading read messages' avatars, in a color
   you choose. Especially helpful in dark mode. On by default; pick the style
   (bar + fade / bar / ring / fade) in Options. Applies to the Cards layout only.
+- **Auto-expand attachments.** Optionally expand the attachment list in the
+  message header automatically, so a message's attachments are visible without
+  clicking the twisty to expand — in the preview pane, a message tab or a
+  standalone message window. On by default; toggle it in Options → Attachments.
 - **Configurable color logic:** muted neutral palette (default), grayscale, soft
   low-saturation hue, vibrant HSL hash, a single fixed color, or your own custom
   palette. Per-sender colors are stable across sessions (deterministic hash).
@@ -52,7 +56,7 @@ tree, in both **Table** and **Cards** layouts, without blocking the main thread.
 | File | Role |
 | --- | --- |
 | `manifest.json` | MV3, registers the experiment, background, and options. |
-| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane`. Injects the renderer + CSS, relays config, resolves BIMI logos (DoH + DMARC + SVG fetch) and Gravatar photos (MD5 + image fetch) with caching, and tears down cleanly. |
+| `api/threadpane/` | Privileged **Experiment API** — the only way to reach `about:3pane` / `about:message`. Injects the renderer + CSS, relays config, resolves BIMI logos (DoH + DMARC + SVG fetch) and Gravatar photos (MD5 + image fetch) with caching, auto-expands the message reader's attachment list, and tears down cleanly. |
 | `injected/avatar-renderer.js` | Runs inside `about:3pane`: observer, idle batching, recycle-aware decoration, per-message BIMI/Gravatar requests (Gravatar > BIMI > initials). |
 | `injected/avatars.css` | Badge styling, driven entirely by CSS custom properties. |
 | `src/avatar-core.js` | Shared, pure logic: initials + color (used by renderer **and** options preview). |
@@ -152,6 +156,10 @@ npm test      # node --test  (61 tests)
   avatar while read ones fade. Mark a message read → the bar/fade updates live.
   **Options → Unread messages** → toggle it, cycle the style, change the accent
   color; the list reflects each change without a restart.
+- **Attachments** → open a message that has attachments → the attachment list in
+  the header is expanded automatically (no need to click the twisty). **Options →
+  Attachments** → toggle it off and open another message to confirm it stays
+  collapsed.
 - **Options → Profile photos (Gravatar)** → enable, then open a folder with a
   sender who has a Gravatar → their photo replaces the initials. Use **Test
   Gravatar…** with a known address to confirm the hash/fetch path.

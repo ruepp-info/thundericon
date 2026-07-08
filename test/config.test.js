@@ -90,6 +90,16 @@ test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {
   assert.equal(s.gravatarSkipFolders.trash, false);
 });
 
+test("attachment auto-expand is on by default and survives partial stored settings", () => {
+  assert.equal(Cfg.DEFAULTS.settings.attachmentsAutoExpand, true);
+  // absent from an older stored profile -> default surfaces on upgrade
+  const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
+  assert.equal(m.settings.attachmentsAutoExpand, true);
+  // an explicit override still wins
+  const m2 = Cfg.mergeSettings({ settings: { attachmentsAutoExpand: false } });
+  assert.equal(m2.settings.attachmentsAutoExpand, false);
+});
+
 test("unread-emphasis defaults survive a partial stored settings (existing profiles)", () => {
   // A profile saved before this feature existed won't have the keys; the defaults
   // must still surface so the feature is available on upgrade.

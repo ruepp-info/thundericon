@@ -44,6 +44,11 @@
       unreadStyle: "bar", // barFade | bar | ring | fade
       unreadAccentColor: "#4aa9ff", // bar/ring color; bright azure, pops on dark
 
+      // Auto-expand the attachment list in the message reader so attachments are
+      // visible without clicking to expand. Pure local UI tweak (no network), so
+      // it's on by default. Handled by the privileged experiment (about:message).
+      attachmentsAutoExpand: true,
+
       // BIMI (Brand Indicators for Message Identification) — opt-in.
       bimiEnabled: false,
       bimiRefreshHours: 168, // 1 week (logos change rarely, like Gravatars)

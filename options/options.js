@@ -149,6 +149,8 @@ function populate() {
   $("unreadStyle").value = s.unreadStyle || "bar";
   $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
 
+  $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
+
   $("bimiEnabled").checked = s.bimiEnabled === true;
   $("bimiBaseDomainOnly").checked = s.bimiBaseDomainOnly === true;
   $("bimiRefreshHours").value = String(s.bimiRefreshHours || 168);
@@ -180,6 +182,7 @@ function wire() {
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor",
+    "attachmentsAutoExpand",
     "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
     "gravatarEnabled", "gravatarRefreshHours"
@@ -309,6 +312,7 @@ function collectScalars() {
   s.unreadEmphasis = $("unreadEmphasis").checked;
   s.unreadStyle = $("unreadStyle").value;
   s.unreadAccentColor = $("unreadAccentColor").value;
+  s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
   s.bimiRefreshHours = parseInt($("bimiRefreshHours").value, 10) || 168;

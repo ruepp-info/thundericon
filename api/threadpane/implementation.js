@@ -1,10 +1,11 @@
 /**
  * Thundericon — privileged Experiment API.
  *
- * Bridges the WebExtension world and the privileged about:3pane document. The
- * message list cannot be reached by ordinary content scripts, so this parent
- * code injects our renderer + stylesheet into each about:3pane window, relays
- * configuration, and tears everything down cleanly on shutdown.
+ * Bridges the WebExtension world and the privileged mail UI, which ordinary
+ * content scripts cannot reach. This parent code injects our renderer + stylesheet
+ * into each about:3pane message list, relays configuration, and tears everything
+ * down cleanly on shutdown. It also (unrelated to avatars, but the same privileged
+ * bridge) auto-expands the attachment list in each about:message reader.
  */
 
 "use strict";
@@ -19,6 +20,9 @@ var { ExtensionSupport } = ChromeUtils.importESModule(
 );
 
 const MESSENGER_WINDOW = "chrome://messenger/content/messenger.xhtml";
+// Standalone message window / message tab host, so attachment auto-expand also
+// works when a message is opened in its own tab or window (not just the preview).
+const MESSAGE_WINDOW = "chrome://messenger/content/messageWindow.xhtml";
 const STYLE_ID = "thundericon-style";
 // Pixel size requested from Gravatar (crisp up to ~48px badges on HiDPI). Fixed
 // so the cache key stays stable regardless of badge-size settings.
@@ -30,6 +34,9 @@ const GRAVATAR_MAX_BYTES = 64 * 1024;
 // BIMI…" window builds its own in-window log independently, so this can stay off
 // for normal use; flip to true to also trace live-list resolution to the console.
 const BIMI_DEBUG = false;
+// Diagnostic logging for the attachment auto-expand path (Error Console). Flip to
+// true to trace which about:message documents get hooked and expanded.
+const ATTACH_DEBUG = false;
 
 // Built-in DoH resolvers for TXT lookups, keyed by the setting value. Each
 // descriptor is just { name, endpoint }; all lookups use the universal RFC 8484
@@ -130,6 +137,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       this._gravatarCache = new Map(); // email -> { status, logo, ts }
       this._gravatarInflight = new Map(); // email -> Promise (coalesce concurrent lookups)
       this._gravatarLoaded = false;
+      this._attachObservers = new Set(); // MutationObservers watching about:message
     }
 
     return {
@@ -149,7 +157,7 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
           this._ensureBimiCore();
           this._ensureGravatarCore();
           ExtensionSupport.registerWindowListener(this._listenerId, {
-            chromeURLs: [MESSENGER_WINDOW],
+            chromeURLs: [MESSENGER_WINDOW, MESSAGE_WINDOW],
             onLoadWindow: (win) => this._hookWindow(win)
           });
         },
@@ -246,7 +254,10 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     }
     this._mailWindows.add(win);
 
-    const rescan = () => win.setTimeout(() => this._scanWindow(win), 0);
+    const rescan = () => win.setTimeout(() => {
+      this._scanWindow(win);
+      this._scanAttachments(win);
+    }, 0);
     const tabmail = win.document.getElementById("tabmail");
     if (tabmail) {
       tabmail.addEventListener("TabOpen", rescan);
@@ -263,10 +274,13 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       win.removeEventListener("unload", onUnload);
     });
 
-    // The 3pane browser may not be ready on first load; scan now and shortly after.
+    // The 3pane / message browser may not be ready on first load; scan now and
+    // shortly after. Attachment scanning is separate (it also covers standalone
+    // message windows, which have no tabmail and so are skipped by _scanWindow).
     this._scanWindow(win);
-    win.setTimeout(() => this._scanWindow(win), 250);
-    win.setTimeout(() => this._scanWindow(win), 1000);
+    this._scanAttachments(win);
+    win.setTimeout(() => { this._scanWindow(win); this._scanAttachments(win); }, 250);
+    win.setTimeout(() => { this._scanWindow(win); this._scanAttachments(win); }, 1000);
   }
 
   _forgetWindow(win) {
@@ -416,6 +430,177 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       } catch (e) {
         /* window navigated away; will be re-injected on next scan */
       }
+    }
+  }
+
+  /* ---- attachment auto-expand (message reader) -------------------------- */
+
+  _alog(...args) {
+    if (ATTACH_DEBUG) {
+      console.log("[Thundericon Attach]", ...args);
+    }
+  }
+
+  // Hand every about:message document reachable from a hooked window to fn(win).
+  // about:message shows up two ways: (a) as a standalone message window / message
+  // tab whose own <browser> is about:message, and (b) nested inside about:3pane as
+  // its #messageBrowser (the preview pane). Both are covered.
+  _forEachAboutMessage(win, fn) {
+    let browsers;
+    try {
+      browsers = win.document.querySelectorAll("browser");
+    } catch (e) {
+      return;
+    }
+    for (const b of browsers) {
+      let spec = "";
+      try {
+        spec = (b.currentURI && b.currentURI.spec) || "";
+      } catch (e) {
+        continue;
+      }
+      if (spec.startsWith("about:message")) {
+        try {
+          fn(b.contentWindow);
+        } catch (e) {
+          /* window gone */
+        }
+      } else if (spec.startsWith("about:3pane")) {
+        try {
+          const inner =
+            b.contentWindow && b.contentWindow.document.getElementById("messageBrowser");
+          const innerSpec = inner && inner.currentURI && inner.currentURI.spec;
+          if (innerSpec && innerSpec.startsWith("about:message")) {
+            fn(inner.contentWindow);
+          }
+        } catch (e) {
+          /* preview browser not ready yet */
+        }
+      }
+    }
+  }
+
+  _scanAttachments(win) {
+    if (win.closed) {
+      return;
+    }
+    this._forEachAboutMessage(win, (mw) => this._hookAttachments(mw));
+  }
+
+  // Install (once per about:message document) a MutationObserver that keeps the
+  // attachment list expanded. The observer is always installed — even when the
+  // feature is off — so toggling it on in Options takes effect on the next
+  // displayed message with no rescan. The expand action is idempotent (it forces
+  // the expanded state, never toggles), so firing on every mutation is safe and it
+  // naturally re-expands for each newly shown message (which rebuilds the list).
+  _hookAttachments(mw) {
+    if (!mw || mw.closed || mw.__thundericonAttachHooked) {
+      return;
+    }
+    const doc = mw.document;
+    if (!doc) {
+      return;
+    }
+    mw.__thundericonAttachHooked = true;
+    this._alog("hooking about:message", doc && doc.documentURI);
+
+    let scheduled = false;
+    const observer = new mw.MutationObserver(() => {
+      if (scheduled) {
+        return;
+      }
+      scheduled = true;
+      // Coalesce the burst of mutations the header emits while a message renders.
+      mw.setTimeout(() => {
+        scheduled = false;
+        this._expandAttachments(mw);
+      }, 30);
+    });
+    try {
+      observer.observe(doc, { childList: true, subtree: true });
+    } catch (e) {
+      mw.__thundericonAttachHooked = false;
+      return;
+    }
+    this._attachObservers.add(observer);
+    mw.addEventListener(
+      "unload",
+      () => {
+        try {
+          observer.disconnect();
+        } catch (e) {
+          /* already gone */
+        }
+        this._attachObservers.delete(observer);
+      },
+      { once: true }
+    );
+    // A message may already be shown at install time.
+    this._expandAttachments(mw);
+  }
+
+  // Expand the attachment list when the feature is on, the message has
+  // attachments, and the list is currently collapsed. Everything below is
+  // internal Thunderbird about:message DOM (element ids, the toggleAttachmentList
+  // global) that is NOT stable WebExtension API — verify/adjust on major TB
+  // updates. Passing `true` to toggleAttachmentList sets the expanded state (it
+  // does not blind-toggle), so re-running is harmless.
+  _expandAttachments(mw) {
+    const on =
+      this._config &&
+      this._config.settings &&
+      this._config.settings.attachmentsAutoExpand !== false;
+    if (!on) {
+      return;
+    }
+    let doc;
+    try {
+      doc = mw.document;
+    } catch (e) {
+      return;
+    }
+    if (!doc) {
+      return;
+    }
+    const list = doc.getElementById("attachmentList");
+    if (!list) {
+      return;
+    }
+    const count = list.childElementCount || list.itemCount || 0;
+    if (!count) {
+      return; // this message has no attachments
+    }
+    const toggle = doc.getElementById("attachmentToggle");
+    // Is it already expanded? Prefer the toggle button's state; fall back to the
+    // list's computed visibility. If we can't tell, err toward expanding.
+    let expanded = false;
+    try {
+      if (toggle && typeof toggle.checked === "boolean") {
+        expanded = toggle.checked;
+      } else if (toggle && toggle.getAttribute("aria-expanded") === "true") {
+        expanded = true;
+      } else {
+        const cs = mw.getComputedStyle(list);
+        expanded = !!cs && cs.display !== "none";
+      }
+    } catch (e) {
+      /* fall through and attempt to expand */
+    }
+    if (expanded) {
+      return;
+    }
+    this._alog("expanding attachment list (" + count + " item(s))");
+    try {
+      if (typeof mw.toggleAttachmentList === "function") {
+        mw.toggleAttachmentList(true);
+      } else if (toggle && typeof toggle.click === "function") {
+        toggle.click();
+      } else {
+        list.removeAttribute("collapsed");
+        list.hidden = false;
+      }
+    } catch (e) {
+      this._reportError("attachment expand failed: " + (e && e.message ? e.message : e));
     }
   }
 
@@ -1117,6 +1302,14 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       }
     }
     this._renderers.clear();
+    for (const obs of this._attachObservers) {
+      try {
+        obs.disconnect();
+      } catch (e) {
+        /* observer's window already gone */
+      }
+    }
+    this._attachObservers.clear();
     for (const win of this._mailWindows) {
       this._forgetWindow(win);
     }

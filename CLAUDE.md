@@ -79,10 +79,19 @@ Gravatar = a sender's self-published profile photo, fetched from `https://gravat
 
 The **Test Gravatar…** tool (`options/gravatar-test.*`) runs the same hash/fetch path and shows the MD5, URL, photo and a step-by-step log.
 
+### Attachment auto-expand
+Unrelated to avatars, but hosted in the **same experiment** (`implementation.js`) because it also needs privileged access to Thunderbird's mail UI. When `settings.attachmentsAutoExpand` is on (default), the message reader's attachment list is expanded automatically so attachments are visible without clicking the twisty. It lives entirely in the host — there is **no renderer/config-bridge change** (the experiment already holds `this._config`):
+
+1. The window listener now also covers the standalone message window (`MESSAGE_WINDOW`), not just the main 3pane. `_scanAttachments` runs alongside the existing avatar scans (`_hookWindow` + `TabOpen`/`TabSelect`).
+2. `_forEachAboutMessage` finds every `about:message` document — both the standalone/tab browser and the one **nested** in `about:3pane` as `#messageBrowser` (the preview pane).
+3. `_hookAttachments` installs **one** `MutationObserver` per `about:message` doc (always, even when the feature is off, so toggling it on needs no rescan). On each coalesced mutation it calls `_expandAttachments`, which is **idempotent** — it force-sets the expanded state via the reader's own `toggleAttachmentList(true)` (guarded by the `#attachmentToggle` state), so it's safe to fire repeatedly and naturally re-expands per message (each message rebuilds the list).
+
+Everything in `_expandAttachments` (`#attachmentList`, `#attachmentToggle`, `toggleAttachmentList`) is **internal about:message DOM, not stable WebExtension API** — verify/adjust on major TB updates. Set `ATTACH_DEBUG = true` at the top of `implementation.js` to trace hooking/expanding to the Error Console.
+
 ### Tests
 - `test/avatar-core.test.js`, `test/bimi-core.test.js` — pure logic (initials, colors, BIMI record parsing, base-domain, DNS wireformat encode/decode/base64url).
 - `test/gravatar-core.test.js` — pure logic (MD5 vectors + Node-crypto cross-check, email normalization, the documented Gravatar hash example, avatar URL, standard base64).
 - `test/config.test.js` — defaults, storage round-trip + merge, change subscription (storage mocked).
 - `test/renderer.test.js` — drives `avatar-renderer.js` against a **jsdom** `about:3pane`: badge rendering, no duplicates, virtualized-row recycling, BIMI/Gravatar image swap-in, Gravatar-over-BIMI precedence, DMARC gate, folder skipping, `destroy()`.
 
-The privileged experiment (`api/threadpane/implementation.js`) is **not** unit-testable — it needs Gecko. Verify those changes in a live Thunderbird (temporary load + Test BIMI / Test Gravatar / Error Console).
+The privileged experiment (`api/threadpane/implementation.js`) is **not** unit-testable — it needs Gecko. Verify those changes in a live Thunderbird (temporary load + Test BIMI / Test Gravatar / Error Console; for attachment auto-expand, open a message with attachments and confirm the list is expanded).

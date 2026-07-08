@@ -17,7 +17,7 @@
       layouts: { table: true, cards: true },
 
       // Color determination
-      colorMode: "mutedPalette", // mutedPalette | grayscale | lowsatHsl | hslHash | fixed | customPalette
+      colorMode: "hslHash", // mutedPalette | grayscale | lowsatHsl | hslHash | fixed | customPalette
       fixedColor: "#6b7280",
       customPalette: ["#6b7280", "#7c8b73", "#b08968", "#6e8198"],
 
@@ -41,7 +41,7 @@
       // default. `unreadStyle` selects the cues: an accent bar on the leading
       // edge of unread cards and/or fading read messages' avatars.
       unreadEmphasis: true,
-      unreadStyle: "barFade", // barFade | bar | ring | fade
+      unreadStyle: "bar", // barFade | bar | ring | fade
       unreadAccentColor: "#4aa9ff", // bar/ring color; bright azure, pops on dark
 
       // BIMI (Brand Indicators for Message Identification) — opt-in.
@@ -66,7 +66,7 @@
         drafts: true,
         templates: true,
         outbox: true,
-        junk: true,
+        junk: false,
         trash: false
       },
 
@@ -82,7 +82,7 @@
         drafts: true,
         templates: true,
         outbox: true,
-        junk: true,
+        junk: false,
         trash: false
       }
     },

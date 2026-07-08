@@ -14,13 +14,26 @@
       <p class="sub">Minimalist sender avatars for your message list.</p>
     </header>
 
-    <!-- Live preview -->
+    <!-- Live preview (always visible, above the tabs) -->
     <section class="card">
       <h2>Preview</h2>
       <ul id="preview" class="preview"></ul>
     </section>
 
-    <div class="grid">
+    <!-- Tab bar: switches which settings panel is shown below. -->
+    <nav class="tabs" role="tablist" aria-label="Settings sections">
+      <button type="button" class="tab" role="tab" id="tab-general"
+              aria-controls="panel-general" aria-selected="true">General</button>
+      <button type="button" class="tab" role="tab" id="tab-unread"
+              aria-controls="panel-unread" aria-selected="false" tabindex="-1">Unread</button>
+      <button type="button" class="tab" role="tab" id="tab-bimi"
+              aria-controls="panel-bimi" aria-selected="false" tabindex="-1">Brand logos</button>
+      <button type="button" class="tab" role="tab" id="tab-gravatar"
+              aria-controls="panel-gravatar" aria-selected="false" tabindex="-1">Profile photos</button>
+    </nav>
+
+    <!-- General: enable, layouts, badge geometry, initials/font, colors -->
+    <div class="grid panel" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
       <!-- General -->
       <section class="card">
         <h2>General</h2>
@@ -119,7 +132,17 @@
         </div>
       </section>
 
-      <!-- Unread emphasis (Cards layout) -->
+      <!-- Domain overrides -->
+      <section class="card span2">
+        <h2>Domain colors</h2>
+        <p class="hint">Force a specific color for senders from a given domain (overrides the mode above).</p>
+        <div id="domainList" class="domains"></div>
+        <button type="button" id="addDomain" class="ghost">+ Add mapping</button>
+      </section>
+    </div>
+
+    <!-- Unread emphasis (Cards layout) -->
+    <div class="grid panel" id="panel-unread" role="tabpanel" aria-labelledby="tab-unread" hidden>
       <section class="card span2">
         <h2>Unread messages (Cards view)</h2>
         <label class="row switch main">
@@ -136,8 +159,8 @@
           <label class="row">
             <span>Style</span>
             <select id="unreadStyle">
-              <option value="barFade">Accent bar + fade read (recommended)</option>
-              <option value="bar">Accent bar only</option>
+              <option value="bar">Accent bar only (recommended)</option>
+              <option value="barFade">Accent bar + fade read</option>
               <option value="ring">Ring around unread avatar</option>
               <option value="fade">Fade read messages</option>
             </select>
@@ -152,16 +175,10 @@
           </p>
         </div>
       </section>
+    </div>
 
-      <!-- Domain overrides -->
-      <section class="card span2">
-        <h2>Domain colors</h2>
-        <p class="hint">Force a specific color for senders from a given domain (overrides the mode above).</p>
-        <div id="domainList" class="domains"></div>
-        <button type="button" id="addDomain" class="ghost">+ Add mapping</button>
-      </section>
-
-      <!-- BIMI brand logos -->
+    <!-- BIMI brand logos -->
+    <div class="grid panel" id="panel-bimi" role="tabpanel" aria-labelledby="tab-bimi" hidden>
       <section class="card span2">
         <h2>Brand logos (BIMI)</h2>
         <label class="row switch main">
@@ -252,8 +269,10 @@
           <p class="hint">Opens a tool to check whether a given domain publishes a BIMI logo, with a step-by-step log.</p>
         </div>
       </section>
+    </div>
 
-      <!-- Gravatar profile photos -->
+    <!-- Gravatar profile photos -->
+    <div class="grid panel" id="panel-gravatar" role="tabpanel" aria-labelledby="tab-gravatar" hidden>
       <section class="card span2">
         <h2>Profile photos (Gravatar)</h2>
         <label class="row switch main">

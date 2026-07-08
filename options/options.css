@@ -23,6 +23,13 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must always win — even on elements that set a `display`
+   via a class, which would otherwise beat the UA [hidden] rule. Covers the
+   conditional groups (.row.conditional) and the tab panels (.grid.panel). */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -53,6 +60,43 @@ body {
 .sub {
   margin: 4px 0 20px;
   color: var(--muted);
+}
+
+/* Tabbed settings board */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 22px 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 15px;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .grid {
@@ -189,10 +233,12 @@ output {
 }
 
 .preview li {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 200px;
+  padding-inline-start: 12px;
 }
 
 .preview .name {
@@ -203,6 +249,30 @@ output {
   display: block;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* Preview mirrors the Cards-view unread emphasis so its effect is visible here.
+   applyRootVars() sets --ti-unread-accent + data-ti-unread-style on :root and
+   renderPreview() tags alternating samples .ti-avatar--unread / --read (the same
+   marker classes the renderer uses); these rules gate on the same cue tokens. */
+:root[data-ti-unread-style~="bar"] .preview li:has(> .ti-avatar--unread)::before {
+  content: "";
+  position: absolute;
+  inset-block: 2px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--ti-unread-accent, #4aa9ff);
+  pointer-events: none;
+}
+
+:root[data-ti-unread-style~="fade"] .preview .ti-avatar--read {
+  opacity: 0.4;
+  filter: grayscale(0.5);
+}
+
+:root[data-ti-unread-style~="ring"] .preview .ti-avatar--unread {
+  box-shadow: 0 0 0 2px var(--ti-unread-accent, #4aa9ff);
 }
 
 /* Custom palette chips */

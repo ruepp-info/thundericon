@@ -9,6 +9,15 @@ const Core = window.ThundericonCore;
 const Cfg = window.ThundericonConfig;
 const $ = (id) => document.getElementById(id);
 
+// unreadStyle -> the space-separated cue tokens the CSS matches with [~="…"].
+// Mirrors UNREAD_STYLE_TOKENS in the renderer so the preview shows the same cues.
+const UNREAD_STYLE_TOKENS = {
+  barFade: "bar fade",
+  bar: "bar",
+  ring: "ring",
+  fade: "fade"
+};
+
 const SAMPLES = [
   "Ada Lovelace <ada@analytical.org>",
   "Grace Hopper <grace@navy.mil>",
@@ -68,9 +77,52 @@ async function init() {
 
   populate();
   wire();
+  wireTabs();
   sideEffects();
   updateCacheStats();
   watchCacheStats();
+}
+
+/* ---- tabbed settings board -------------------------------------------- */
+
+// A minimal ARIA tablist: selecting a tab (by click or arrow key) shows its
+// panel and hides the rest. Panels are plain .grid containers with
+// role="tabpanel"; only one is ever visible, the rest carry the `hidden` attr.
+function wireTabs() {
+  const tabs = Array.from(document.querySelectorAll(".tab"));
+  function select(tab, focus) {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      const panel = document.getElementById(t.getAttribute("aria-controls"));
+      if (panel) {
+        panel.hidden = !on;
+      }
+    }
+    if (focus) {
+      tab.focus();
+    }
+  }
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(tab));
+    tab.addEventListener("keydown", (e) => {
+      let next = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        next = tabs[(i + 1) % tabs.length];
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        next = tabs[(i - 1 + tabs.length) % tabs.length];
+      } else if (e.key === "Home") {
+        next = tabs[0];
+      } else if (e.key === "End") {
+        next = tabs[tabs.length - 1];
+      }
+      if (next) {
+        e.preventDefault();
+        select(next, true);
+      }
+    });
+  });
 }
 
 /* ---- populate controls from state ------------------------------------- */
@@ -94,7 +146,7 @@ function populate() {
   $("fixedColor").value = Core.normalizeHex(s.fixedColor) || "#6b7280";
 
   $("unreadEmphasis").checked = s.unreadEmphasis !== false;
-  $("unreadStyle").value = s.unreadStyle || "barFade";
+  $("unreadStyle").value = s.unreadStyle || "bar";
   $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
 
   $("bimiEnabled").checked = s.bimiEnabled === true;
@@ -501,12 +553,27 @@ function applyRootVars() {
   root.setProperty("--ti-weight", String(s.fontWeight || 600));
   root.setProperty("--ti-fontscale", String(s.fontScale || 0.42));
   root.setProperty("--ti-transform", s.uppercase === false ? "none" : "uppercase");
+
+  // Mirror the Cards-view unread emphasis onto the root so the preview shows it
+  // (the preview reuses the same accent color + cue tokens as the renderer).
+  root.setProperty("--ti-unread-accent", Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff");
+  if (s.unreadEmphasis !== false) {
+    document.documentElement.dataset.tiUnreadStyle =
+      UNREAD_STYLE_TOKENS[s.unreadStyle] || UNREAD_STYLE_TOKENS.bar;
+  } else {
+    delete document.documentElement.dataset.tiUnreadStyle;
+  }
 }
 
 function renderPreview() {
   const ul = $("preview");
   ul.textContent = "";
-  for (const author of SAMPLES) {
+  // Show the Cards-view unread emphasis in the preview: tag alternating samples
+  // read/unread (only when the feature is on) so the accent bar / fade / ring is
+  // visible right here. The badge marker classes match the renderer's; the
+  // preview-scoped rules in options.css gate on the same data-ti-unread-style.
+  const unreadOn = state.settings.unreadEmphasis !== false;
+  SAMPLES.forEach((author, i) => {
     const desc = Core.describe(author, state.settings, state.domainColors);
 
     const li = document.createElement("li");
@@ -515,6 +582,11 @@ function renderPreview() {
     badge.textContent = desc.initials;
     badge.style.setProperty("--ti-color", desc.background);
     badge.style.setProperty("--ti-fg", desc.foreground);
+    if (unreadOn) {
+      const unread = i % 2 === 0;
+      badge.classList.toggle("ti-avatar--unread", unread);
+      badge.classList.toggle("ti-avatar--read", !unread);
+    }
 
     const text = document.createElement("span");
     const name = document.createElement("span");
@@ -527,7 +599,7 @@ function renderPreview() {
 
     li.append(badge, text);
     ul.append(li);
-  }
+  });
 }
 
 /* ---- reset ------------------------------------------------------------ */

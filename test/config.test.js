@@ -77,8 +77,17 @@ test("mergeSettings merges the layouts sub-object", () => {
 test("unread-emphasis defaults exist", () => {
   const s = Cfg.DEFAULTS.settings;
   assert.equal(s.unreadEmphasis, true);
-  assert.equal(s.unreadStyle, "barFade");
+  assert.equal(s.unreadStyle, "bar");
   assert.equal(s.unreadAccentColor, "#4aa9ff");
+});
+
+test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {
+  const s = Cfg.DEFAULTS.settings;
+  assert.equal(s.colorMode, "hslHash");
+  assert.equal(s.bimiSkipFolders.junk, false);
+  assert.equal(s.bimiSkipFolders.trash, false);
+  assert.equal(s.gravatarSkipFolders.junk, false);
+  assert.equal(s.gravatarSkipFolders.trash, false);
 });
 
 test("unread-emphasis defaults survive a partial stored settings (existing profiles)", () => {
@@ -86,7 +95,7 @@ test("unread-emphasis defaults survive a partial stored settings (existing profi
   // must still surface so the feature is available on upgrade.
   const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
   assert.equal(m.settings.unreadEmphasis, true);
-  assert.equal(m.settings.unreadStyle, "barFade");
+  assert.equal(m.settings.unreadStyle, "bar");
   assert.equal(m.settings.unreadAccentColor, "#4aa9ff");
   // an explicit override still wins
   const m2 = Cfg.mergeSettings({ settings: { unreadStyle: "ring" } });

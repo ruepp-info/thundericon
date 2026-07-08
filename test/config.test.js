@@ -80,6 +80,10 @@ test("unread-emphasis defaults exist", () => {
   assert.equal(s.unreadStyle, "bar");
   assert.equal(s.unreadAccentColor, "#4aa9ff");
   assert.equal(s.unreadBarWidth, "medium");
+  assert.equal(s.unreadGlyph, "»");
+  assert.equal(s.unreadGlyphSize, 14);
+  assert.equal(s.unreadGlyphBold, false);
+  assert.ok(s.unreadGlyphFont);
 });
 
 test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {

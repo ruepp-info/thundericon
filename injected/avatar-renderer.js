@@ -548,7 +548,11 @@
     "--ti-fontscale",
     "--ti-transform",
     "--ti-unread-accent",
-    "--ti-unread-bar-width"
+    "--ti-unread-bar-width",
+    "--ti-unread-glyph",
+    "--ti-unread-glyph-font",
+    "--ti-unread-glyph-size",
+    "--ti-unread-glyph-weight"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -556,12 +560,24 @@
     barFade: "bar fade",
     bar: "bar",
     dot: "dot",
+    glyph: "glyph",
     ring: "ring",
     fade: "fade"
   };
 
   // unreadBarWidth -> accent-bar thickness in px.
   const UNREAD_BAR_WIDTHS = { narrow: "2px", medium: "4px", wide: "6px" };
+
+  // Build a CSS `content` value (a quoted string) from the configured glyph: take
+  // the first code point (so an emoji works), escape it for a double-quoted CSS
+  // string, and fall back to a bullet when empty.
+  function glyphContent(raw) {
+    const ch = Array.from(String(raw == null ? "" : raw))[0] || "";
+    if (!ch) {
+      return '"\\2022"'; // U+2022 bullet
+    }
+    return '"' + ch.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
 
   function applyConfig(cfg) {
     cfg = cfg || {};
@@ -589,6 +605,21 @@
     rootStyle.setProperty(
       "--ti-unread-bar-width",
       UNREAD_BAR_WIDTHS[settings.unreadBarWidth] || UNREAD_BAR_WIDTHS.medium
+    );
+    // "glyph" style: a single character drawn where the dot sits, in the accent
+    // color, with its own font / size / weight.
+    rootStyle.setProperty("--ti-unread-glyph", glyphContent(settings.unreadGlyph));
+    rootStyle.setProperty(
+      "--ti-unread-glyph-font",
+      settings.unreadGlyphFont || "inherit"
+    );
+    rootStyle.setProperty(
+      "--ti-unread-glyph-size",
+      (Number(settings.unreadGlyphSize) || 14) + "px"
+    );
+    rootStyle.setProperty(
+      "--ti-unread-glyph-weight",
+      settings.unreadGlyphBold ? "700" : "400"
     );
     const styleTokens = UNREAD_STYLE_TOKENS[settings.unreadStyle] || UNREAD_STYLE_TOKENS.barFade;
     if (unreadOn) {

@@ -164,6 +164,7 @@
               <option value="bar">Accent bar only (recommended)</option>
               <option value="barFade">Accent bar + fade read</option>
               <option value="dot">Colored dot</option>
+              <option value="glyph">Single character</option>
               <option value="ring">Ring around unread avatar</option>
               <option value="fade">Fade read messages</option>
             </select>
@@ -180,9 +181,28 @@
               <option value="wide">Wide</option>
             </select>
           </label>
+          <div class="conditional" id="unreadGlyphGroup">
+            <label class="row">
+              <span>Character</span>
+              <input type="text" id="unreadGlyph" maxlength="2" spellcheck="false" />
+            </label>
+            <label class="row stack">
+              <span>Character font</span>
+              <input type="text" id="unreadGlyphFont" spellcheck="false" />
+            </label>
+            <label class="row">
+              <span>Character size <output id="unreadGlyphSizeOut"></output></span>
+              <input type="range" id="unreadGlyphSize" min="8" max="24" step="1" />
+            </label>
+            <label class="row switch">
+              <input type="checkbox" id="unreadGlyphBold" />
+              <span>Bold</span>
+            </label>
+          </div>
           <p class="hint">
-            The accent color is used for the bar, dot and ring; the width sets the
-            bar's thickness. The <em>Fade read</em> style uses neither.
+            The accent color is used for the bar, dot, character and ring; the
+            width sets the bar's thickness. The <em>Fade read</em> style uses none
+            of these.
           </p>
         </div>
       </section>

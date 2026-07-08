@@ -154,6 +154,24 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   pointer-events: none;
 }
 
+/* Single character in the accent color, drawn where the dot sits, with its own
+   font / size / weight (all from --ti-unread-glyph* set by the renderer). Same
+   td::before as bar/dot; the tokens are mutually exclusive so they never clash. */
+:root[data-ti-unread-style~="glyph"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread)::before {
+  content: var(--ti-unread-glyph, "\2022");
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 2px;
+  transform: translateY(-50%);
+  color: var(--ti-unread-accent, #4aa9ff);
+  font-family: var(--ti-unread-glyph-font, inherit);
+  font-size: var(--ti-unread-glyph-size, 14px);
+  font-weight: var(--ti-unread-glyph-weight, 400);
+  line-height: 1;
+  pointer-events: none;
+}
+
 /* Fade read messages so unread ones pop (applies to initials and photos). */
 :root[data-ti-unread-style~="fade"]
   tr[is="thread-card"] .ti-avatar--read {

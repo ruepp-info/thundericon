@@ -15,12 +15,23 @@ const UNREAD_STYLE_TOKENS = {
   barFade: "bar fade",
   bar: "bar",
   dot: "dot",
+  glyph: "glyph",
   ring: "ring",
   fade: "fade"
 };
 
 // unreadBarWidth -> accent-bar thickness in px (mirrors the renderer).
 const UNREAD_BAR_WIDTHS = { narrow: "2px", medium: "4px", wide: "6px" };
+
+// Build a CSS `content` value from the configured glyph (mirrors the renderer):
+// first code point, escaped for a double-quoted CSS string, bullet when empty.
+function glyphContent(raw) {
+  const ch = Array.from(String(raw == null ? "" : raw))[0] || "";
+  if (!ch) {
+    return '"\\2022"';
+  }
+  return '"' + ch.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+}
 
 const SAMPLES = [
   "Ada Lovelace <ada@analytical.org>",
@@ -153,6 +164,10 @@ function populate() {
   $("unreadStyle").value = s.unreadStyle || "bar";
   $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
   $("unreadBarWidth").value = s.unreadBarWidth || "medium";
+  $("unreadGlyph").value = s.unreadGlyph != null ? s.unreadGlyph : "»";
+  $("unreadGlyphFont").value = s.unreadGlyphFont || Cfg.DEFAULTS.settings.unreadGlyphFont;
+  $("unreadGlyphSize").value = s.unreadGlyphSize || 14;
+  $("unreadGlyphBold").checked = s.unreadGlyphBold === true;
 
   $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
 
@@ -187,6 +202,7 @@ function wire() {
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
+    "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
     "attachmentsAutoExpand",
     "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
@@ -318,6 +334,10 @@ function collectScalars() {
   s.unreadStyle = $("unreadStyle").value;
   s.unreadAccentColor = $("unreadAccentColor").value;
   s.unreadBarWidth = $("unreadBarWidth").value;
+  s.unreadGlyph = $("unreadGlyph").value;
+  s.unreadGlyphFont = $("unreadGlyphFont").value.trim() || Cfg.DEFAULTS.settings.unreadGlyphFont;
+  s.unreadGlyphSize = parseInt($("unreadGlyphSize").value, 10) || 14;
+  s.unreadGlyphBold = $("unreadGlyphBold").checked;
   s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
@@ -490,6 +510,7 @@ function updateOutputs() {
   $("badgeSizeOut").textContent = $("badgeSize").value + "px";
   $("borderRadiusOut").textContent =
     $("borderRadius").value === "50" ? "circle" : $("borderRadius").value + "%";
+  $("unreadGlyphSizeOut").textContent = $("unreadGlyphSize").value + "px";
 }
 
 function sideEffects() {
@@ -511,12 +532,17 @@ function updateUnreadState() {
   const on = $("unreadEmphasis").checked;
   const style = $("unreadStyle").value;
   const hasBar = style === "bar" || style === "barFade";
+  const isGlyph = style === "glyph";
   $("unreadStyle").disabled = !on;
   $("unreadAccentColor").disabled = !on || style === "fade";
   $("unreadBarWidth").disabled = !on || !hasBar;
+  for (const id of ["unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold"]) {
+    $(id).disabled = !on || !isGlyph;
+  }
   $("unreadGroup").classList.toggle("disabled", !on);
   $("unreadColorGroup").hidden = style === "fade";
   $("unreadWidthGroup").hidden = !hasBar; // width only applies to the bar
+  $("unreadGlyphGroup").hidden = !isGlyph; // character options only for the glyph
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them
@@ -575,6 +601,10 @@ function applyRootVars() {
     "--ti-unread-bar-width",
     UNREAD_BAR_WIDTHS[s.unreadBarWidth] || UNREAD_BAR_WIDTHS.medium
   );
+  root.setProperty("--ti-unread-glyph", glyphContent(s.unreadGlyph));
+  root.setProperty("--ti-unread-glyph-font", s.unreadGlyphFont || "inherit");
+  root.setProperty("--ti-unread-glyph-size", (Number(s.unreadGlyphSize) || 14) + "px");
+  root.setProperty("--ti-unread-glyph-weight", s.unreadGlyphBold ? "700" : "400");
   if (s.unreadEmphasis !== false) {
     document.documentElement.dataset.tiUnreadStyle =
       UNREAD_STYLE_TOKENS[s.unreadStyle] || UNREAD_STYLE_TOKENS.bar;

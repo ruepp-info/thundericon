@@ -21,8 +21,8 @@ tree, in both **Table** and **Cards** layouts, without blocking the main thread.
   than Thunderbird's default bold — an Outlook/eM Client-style accent bar on the
   leading edge of unread cards and/or fading read messages' avatars, in a color
   you choose. Especially helpful in dark mode. On by default; pick the style
-  (bar + fade / bar / ring / fade) and the bar width (narrow / medium / wide) in
-  Options. Applies to the Cards layout only.
+  (bar + fade / bar / dot / ring / fade) and the bar width (narrow / medium /
+  wide) in Options. Applies to the Cards layout only.
 - **Auto-expand attachments.** Optionally expand the attachment list in the
   message header automatically, so a message's attachments are visible without
   clicking the twisty to expand — in the preview pane, a message tab or a

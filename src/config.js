@@ -41,7 +41,7 @@
       // default. `unreadStyle` selects the cues: an accent bar on the leading
       // edge of unread cards and/or fading read messages' avatars.
       unreadEmphasis: true,
-      unreadStyle: "bar", // barFade | bar | ring | fade
+      unreadStyle: "bar", // barFade | bar | dot | ring | fade
       unreadAccentColor: "#4aa9ff", // bar/ring color; bright azure, pops on dark
       unreadBarWidth: "medium", // narrow | medium | wide (accent bar thickness)
 

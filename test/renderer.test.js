@@ -370,6 +370,10 @@ test("applyConfig sets the accent color and style tokens on the root", async () 
   cfg.settings.unreadStyle = "ring";
   window.__thundericon.apply(JSON.stringify(cfg));
   assert.equal(doc.documentElement.dataset.tiUnreadStyle, "ring");
+
+  cfg.settings.unreadStyle = "dot";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, "dot");
 });
 
 /* ---- BIMI logo branch ------------------------------------------------- */

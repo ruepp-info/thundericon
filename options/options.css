@@ -266,6 +266,19 @@ output {
   pointer-events: none;
 }
 
+:root[data-ti-unread-style~="dot"] .preview li:has(> .ti-avatar--unread)::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 0;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--ti-unread-accent, #4aa9ff);
+  pointer-events: none;
+}
+
 :root[data-ti-unread-style~="fade"] .preview .ti-avatar--read {
   opacity: 0.4;
   filter: grayscale(0.5);

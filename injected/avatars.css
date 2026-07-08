@@ -137,6 +137,23 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   pointer-events: none;
 }
 
+/* Colored dot on the leading edge of an unread card, vertically centered — an
+   alternative to the full-height bar. Reuses the same td::before; the "dot" and
+   "bar" tokens are mutually exclusive presets, so they never target it together. */
+:root[data-ti-unread-style~="dot"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread)::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 2px;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--ti-unread-accent, #4aa9ff);
+  pointer-events: none;
+}
+
 /* Fade read messages so unread ones pop (applies to initials and photos). */
 :root[data-ti-unread-style~="fade"]
   tr[is="thread-card"] .ti-avatar--read {

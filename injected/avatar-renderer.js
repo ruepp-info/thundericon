@@ -555,6 +555,7 @@
   const UNREAD_STYLE_TOKENS = {
     barFade: "bar fade",
     bar: "bar",
+    dot: "dot",
     ring: "ring",
     fade: "fade"
   };

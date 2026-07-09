@@ -288,6 +288,14 @@
     badge.classList.toggle("ti-avatar--unread", unread);
     badge.classList.toggle("ti-avatar--read", read);
 
+    // Expose the per-sender colour on the card cell so the "rowTint" style can
+    // wash the whole row in the sender's colour (icon-colour mode). Harmless
+    // otherwise — the CSS only reads it for unread rowTint cells, and image rows
+    // fall back to the fixed colour regardless.
+    if (layout === "card" && badge.parentNode && badge.parentNode.style) {
+      badge.parentNode.style.setProperty("--ti-row-color", desc.background);
+    }
+
     // Not yet resolved → ask the privileged host. Both run in parallel; negative
     // results are cached, so this converges (and stays cheap) once all are known.
     if (gravatarOn && msgId && hdr && !gravatarByMsg.has(msgId)) {
@@ -534,6 +542,10 @@
       return;
     }
     for (const badge of target.querySelectorAll(".ti-avatar")) {
+      const cell = badge.parentNode;
+      if (cell && cell.style) {
+        cell.style.removeProperty("--ti-row-color");
+      }
       badge.remove();
     }
   }
@@ -564,6 +576,7 @@
     dot: "dot",
     glyph: "glyph",
     fill: "fill",
+    rowTint: "rowTint",
     ring: "ring",
     fade: "fade"
   };

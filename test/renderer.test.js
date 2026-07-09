@@ -220,6 +220,8 @@ test("card rows place the badge in the cell, beside (not inside) the card conten
   assert.equal(badge.parentElement.tagName, "TD");
   assert.equal(badge.parentElement.firstElementChild, badge);
   assert.ok(badge.nextElementSibling.classList.contains("card-layout"));
+  // The card cell exposes the sender colour for the rowTint style.
+  assert.match(badge.parentElement.style.getPropertyValue("--ti-row-color"), /^#[0-9a-f]{6}$/);
 });
 
 test("applies geometry through root CSS variables", async () => {
@@ -394,6 +396,11 @@ test("applyConfig sets the accent color and style tokens on the root", async () 
   assert.equal(doc.documentElement.dataset.tiFillMode, "iconColor");
   assert.equal(rootStyle.getPropertyValue("--ti-unread-fill"), "#123456");
   assert.ok(rootStyle.getPropertyValue("--ti-unread-fill-fg"));
+
+  cfg.settings.unreadStyle = "rowTint";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, "rowTint");
+  assert.equal(doc.documentElement.dataset.tiFillMode, "iconColor");
 });
 
 /* ---- BIMI logo branch ------------------------------------------------- */

@@ -304,15 +304,36 @@ output {
   box-shadow: 0 0 0 2px var(--ti-unread-accent, #4aa9ff);
 }
 
-/* Fill style: square off the unread sample badges so the fill covers the whole
-   box; fixed mode recolours them; icon-colour mode leaves initials on their own
-   colour (the preview has no image badges). */
+/* Fill style: paint the icon's column behind the (untouched) sample badge,
+   mirroring the message list — the icon keeps its own color, the background is
+   added. The badge is a flex item here (not absolute), so raise it above the
+   column ::before. */
 :root[data-ti-unread-style~="fill"] .preview .ti-avatar--unread {
-  border-radius: 0;
+  position: relative;
+  z-index: 1;
 }
-:root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"] .preview .ti-avatar--unread {
-  background-color: var(--ti-unread-fill, #4aa9ff);
-  color: var(--ti-unread-fill-fg, #ffffff);
+:root[data-ti-unread-style~="fill"] .preview li:has(> .ti-avatar--unread)::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: calc(var(--ti-size, 24px) + 16px);
+  pointer-events: none;
+}
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"] .preview li:has(> .ti-avatar--unread)::before {
+  background: var(--ti-unread-fill, #4aa9ff);
+}
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="iconColor"] .preview li:has(> .ti-avatar--unread)::before {
+  background: var(--ti-row-color, var(--ti-unread-fill, #4aa9ff));
+}
+
+/* Row-tint style: wash the whole sample row (fixed color, or the sample's own
+   color in icon-color mode) — mirrors the message list's translucent row wash. */
+:root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="fixed"] .preview li:has(> .ti-avatar--unread) {
+  background-color: color-mix(in srgb, var(--ti-unread-fill, #4aa9ff) 15%, transparent);
+}
+:root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"] .preview li:has(> .ti-avatar--unread) {
+  background-color: color-mix(in srgb, var(--ti-row-color, var(--ti-unread-fill, #4aa9ff)) 15%, transparent);
 }
 
 /* Custom palette chips */

@@ -202,32 +202,59 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   box-shadow: 0 0 0 2px var(--ti-unread-accent, #4aa9ff);
 }
 
-/* "fill" style: fill the unread avatar's background instead of drawing a marker.
- * Fixed mode fills every unread avatar (initials and image icons) with the chosen
- * colour and recolours the initials for legibility (--ti-unread-fill-fg, computed
- * for contrast by the renderer). Icon-colour mode leaves initials on their own
- * per-sender colour and only fills image icons (BIMI / Gravatar) — which have no
- * single colour — with the fixed colour. The two-attribute selectors easily beat
- * the .ti-avatar--bimi/--photo `background: transparent`, so no !important. */
-
-/* Fill the WHOLE square the icon occupies, not just its rounded silhouette: drop
- * the corner radius for unread cards so the colour covers the full badge box (the
- * badge is size*1.7 square in Cards view). Applies in both fill modes. */
+/* "fill" style: paint a colour behind the icon across the WHOLE avatar column for
+ * unread — the full-height space from the card's leading edge to where the card
+ * text starts (size*1.7 + 16px wide). The icon itself is left UNTOUCHED (its real
+ * per-sender colour / logo / photo, normal shape); the colour is only added behind
+ * it, via a full-height cell ::before that the absolutely-positioned badge paints
+ * over. (bar/dot/glyph also use this ::before, but the tokens are mutually
+ * exclusive, so no collision.) Fixed mode uses the chosen colour; icon-colour mode
+ * uses the sender's own colour (--ti-row-color) for initials rows (so the icon sits
+ * on a same-colour block) and the fixed colour for image icons (BIMI / Gravatar),
+ * which have no single colour. */
 :root[data-ti-unread-style~="fill"]
-  tr[is="thread-card"] .ti-avatar--unread {
-  border-radius: 0;
+  tr[is="thread-card"] td:has(> .ti-avatar--unread)::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: calc(var(--ti-size, 24px) * 1.7 + 16px);
+  pointer-events: none;
 }
 :root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"]
-  tr[is="thread-card"] .ti-avatar--unread {
-  background-color: var(--ti-unread-fill, #4aa9ff);
-}
-:root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"]
-  tr[is="thread-card"] .ti-avatar--unread:not(.ti-avatar--bimi):not(.ti-avatar--photo) {
-  color: var(--ti-unread-fill-fg, #ffffff);
+  tr[is="thread-card"] td:has(> .ti-avatar--unread)::before {
+  background: var(--ti-unread-fill, #4aa9ff);
 }
 :root[data-ti-unread-style~="fill"][data-ti-fill-mode="iconColor"]
-  tr[is="thread-card"] .ti-avatar--unread.ti-avatar--bimi,
+  tr[is="thread-card"] td:has(> .ti-avatar--unread:not(.ti-avatar--bimi):not(.ti-avatar--photo))::before {
+  background: var(--ti-row-color, var(--ti-unread-fill, #4aa9ff));
+}
 :root[data-ti-unread-style~="fill"][data-ti-fill-mode="iconColor"]
-  tr[is="thread-card"] .ti-avatar--unread.ti-avatar--photo {
-  background-color: var(--ti-unread-fill, #4aa9ff);
+  tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--bimi)::before,
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="iconColor"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--photo)::before {
+  background: var(--ti-unread-fill, #4aa9ff);
+}
+
+/* "rowTint" style: wash the whole card cell (the visual row) with a translucent
+ * colour for unread — a whole-row highlight (Outlook / eM Client style). Reuses
+ * the fill style's fixed/iconColor mode + colour (data-ti-fill-mode +
+ * --ti-unread-fill). The wash is translucent (color-mix … transparent) so
+ * Thunderbird's own selection / hover / alternating-row backgrounds still read
+ * through it. Icon-colour mode uses the sender's colour (--ti-row-color, set per
+ * cell by the renderer); image icons (BIMI / Gravatar) have no single colour, so
+ * they fall back to the fixed colour. */
+:root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="fixed"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread) {
+  background-color: color-mix(in srgb, var(--ti-unread-fill, #4aa9ff) 15%, transparent);
+}
+:root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread:not(.ti-avatar--bimi):not(.ti-avatar--photo)) {
+  background-color: color-mix(in srgb, var(--ti-row-color, var(--ti-unread-fill, #4aa9ff)) 15%, transparent);
+}
+:root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--bimi),
+:root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
+  tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--photo) {
+  background-color: color-mix(in srgb, var(--ti-unread-fill, #4aa9ff) 15%, transparent);
 }

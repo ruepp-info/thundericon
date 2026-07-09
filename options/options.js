@@ -16,6 +16,8 @@ const UNREAD_STYLE_TOKENS = {
   bar: "bar",
   dot: "dot",
   glyph: "glyph",
+  fill: "fill",
+  rowTint: "rowTint",
   ring: "ring",
   fade: "fade"
 };
@@ -538,23 +540,23 @@ function updateUnreadState() {
   const style = $("unreadStyle").value;
   const hasBar = style === "bar" || style === "barFade";
   const isGlyph = style === "glyph";
-  const isFill = style === "fill";
-  // The accent color drives the bar/dot/glyph/ring; the fill and fade styles use
-  // their own settings, so the accent picker doesn't apply to them.
-  const usesAccent = !isFill && style !== "fade";
+  // Both "fill" (icon square) and "rowTint" (whole row) use the same fill
+  // color/mode controls; the accent drives the bar/dot/glyph/ring instead.
+  const usesFill = style === "fill" || style === "rowTint";
+  const usesAccent = !usesFill && style !== "fade";
   $("unreadStyle").disabled = !on;
   $("unreadAccentColor").disabled = !on || !usesAccent;
   $("unreadBarWidth").disabled = !on || !hasBar;
   for (const id of ["unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold"]) {
     $(id).disabled = !on || !isGlyph;
   }
-  $("unreadFillMode").disabled = !on || !isFill;
-  $("unreadFillColor").disabled = !on || !isFill;
+  $("unreadFillMode").disabled = !on || !usesFill;
+  $("unreadFillColor").disabled = !on || !usesFill;
   $("unreadGroup").classList.toggle("disabled", !on);
   $("unreadColorGroup").hidden = !usesAccent;
   $("unreadWidthGroup").hidden = !hasBar; // width only applies to the bar
   $("unreadGlyphGroup").hidden = !isGlyph; // character options only for the glyph
-  $("unreadFillGroup").hidden = !isFill; // fill options only for the fill style
+  $("unreadFillGroup").hidden = !usesFill; // fill color/mode for fill + row tint
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them
@@ -643,6 +645,7 @@ function renderPreview() {
     const desc = Core.describe(author, state.settings, state.domainColors);
 
     const li = document.createElement("li");
+    li.style.setProperty("--ti-row-color", desc.background); // for the rowTint style
     const badge = document.createElement("span");
     badge.className = "ti-avatar ti-avatar--row";
     badge.textContent = desc.initials;

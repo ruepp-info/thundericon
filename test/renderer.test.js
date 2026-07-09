@@ -163,6 +163,74 @@ test("recycled row (same element, new sender) updates initials, stays single", a
   assert.equal(row.querySelectorAll(".ti-avatar").length, 1);
 });
 
+// The tree rebuilds its rows from scratch (`table.body.replaceChildren()`) on
+// every `reset()`, and a folder switch resets at least twice. Badges must land in
+// the same painted frame as the row that carries them, or they blink.
+test("a freshly built card row is decorated before the next paint", async () => {
+  const { window, doc, tbody, authors } = setup();
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
+
+  authors[0] = "Ada Lovelace <ada@x.org>";
+  tbody.appendChild(addRow(doc, { index: 0, kind: "card", text: "Ada Lovelace" }));
+
+  // Microtasks only — no timer, no idle callback, so no paint can have happened.
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const badge = tbody.querySelector(".ti-avatar--card");
+  assert.ok(badge, "card badge added in the mutation-observer microtask");
+  assert.equal(badge.textContent, "AL");
+});
+
+test("a card row the tree has not filled yet gets no placeholder badge", async () => {
+  const { window, doc, tbody } = setup();
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
+
+  // No gDBView header (authors[0] unset) and no text yet: the tree fills the row
+  // an animation frame later. Drawing a "?" now and correcting it after the fill
+  // would be its own flicker, so the row waits for the idle flush.
+  const card = addRow(doc, { index: 0, kind: "card", text: "" });
+  tbody.appendChild(card);
+
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(card.querySelector(".ti-avatar"), null, "no badge drawn from nothing");
+
+  // Once the tree fills it, the scraped fallback still decorates it.
+  card.querySelector(".card-layout").textContent = "Grace Hopper";
+  await waitFor(() => card.querySelector(".ti-avatar"));
+  assert.equal(card.querySelector(".ti-avatar").textContent, "GH");
+});
+
+test("badge torn out by a row refill is restored before the next paint", async () => {
+  const { window, doc, tbody, authors } = setup();
+  window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));
+
+  authors[0] = "Ada Lovelace <ada@x.org>";
+  const row = addRow(doc, { index: 0, text: "Ada Lovelace" });
+  tbody.appendChild(row);
+  await waitFor(() => row.querySelector(".ti-avatar"));
+
+  // A folder switch makes the tree fill its visible rows more than once, and each
+  // fill wipes the cell our badge lives in. Restoring on the idle flush would
+  // leave the row badge-less for a painted frame or two — the icon flickers.
+  authors[7] = "Bob Smith <bob@y.org>";
+  row.index = 7;
+  row.querySelector("td.correspondentcol-column").textContent = "Bob Smith";
+  assert.equal(row.querySelector(".ti-avatar"), null, "the refill wipes the badge");
+
+  // Mutation observer callbacks are microtasks, so awaiting microtasks alone (no
+  // timer, no idle callback, and therefore no paint) must be enough to get it
+  // back. Anything slower is a visible flicker.
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const badge = row.querySelector(".ti-avatar");
+  assert.ok(badge, "badge restored in the mutation-observer microtask");
+  assert.equal(badge.textContent, "BS", "restored with the new sender's initials");
+  assert.equal(row.querySelectorAll(".ti-avatar").length, 1);
+});
+
 test("unchanged recycled row keeps the same badge element (idempotent)", async () => {
   const { window, doc, tbody, authors } = setup();
   window.__thundericon.apply(JSON.stringify(DEFAULT_CONFIG));

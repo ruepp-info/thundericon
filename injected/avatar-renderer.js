@@ -108,13 +108,14 @@
   /* ---- mutation handling ------------------------------------------------ */
 
   function onMutations(records) {
+    const touched = new Set(); // rows this batch changed; candidates for renderNow
     for (const m of records) {
       const el = m.target && m.target.nodeType === 1 ? m.target : m.target && m.target.parentElement;
       // Ignore mutations we caused inside our own badges (re-entrancy guard).
       if (el && el.closest && el.closest(".ti-avatar")) {
         continue;
       }
-      collectRow(el);
+      collectRow(el, touched);
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) {
           continue;
@@ -122,15 +123,25 @@
         if (node.classList && node.classList.contains("ti-avatar")) {
           continue;
         }
-        collectRow(node);
+        collectRow(node, touched);
       }
+    }
+    if (touched.size) {
+      renderNow(touched);
     }
     if (pending.size) {
       scheduleFlush();
     }
   }
 
-  function collectRow(node) {
+  function rowOf(el) {
+    if (!el || !el.closest) {
+      return null;
+    }
+    return el.matches(ROW_SELECTOR) ? el : el.closest(ROW_SELECTOR);
+  }
+
+  function collectRow(node, touched) {
     let el = node;
     if (!el) {
       return;
@@ -138,12 +149,91 @@
     if (el.nodeType !== 1) {
       el = el.parentElement;
     }
-    if (!el || !el.closest) {
-      return;
-    }
-    const row = el.matches(ROW_SELECTOR) ? el : el.closest(ROW_SELECTOR);
+    const row = rowOf(el);
     if (row) {
       pending.add(row);
+      if (touched) {
+        touched.add(row);
+      }
+    }
+  }
+
+  /* ---- synchronous first render (anti-flicker) -------------------------- */
+
+  // A row that ought to carry a badge but doesn't is a *visible hole*: in Cards
+  // layout the whole "rowTint"/"fill" background hangs off `td:has(> .ti-avatar)`,
+  // so a missing badge un-paints the entire row. Thunderbird empties and rebuilds
+  // rows far more often than one would think:
+  //
+  //   - `TreeViewTableBody.reset()` does `table.body.replaceChildren()`, throwing
+  //     away every row element (and every badge with it). A folder switch runs it
+  //     at least twice: once from `set view`, then again when the db view calls
+  //     `_jsTree.invalidate()` once the folder finishes loading.
+  //   - In Table layout `ThreadRow.fillRow()` assigns `cell.textContent`, which
+  //     deletes the badge sitting in that cell.
+  //
+  // Deferring those to the idle flush leaves the rows badge-less for one or more
+  // painted frames — the flicker. Mutation observer callbacks are microtasks, so
+  // they run *before* the paint that the tree's own DOM writes are about to
+  // trigger; drawing the badge from there lands it in the same frame as the row
+  // content it belongs to, and the empty frame never reaches the screen.
+  //
+  // Only badge-less rows take this path. A row that already has one is left to the
+  // idle flush: its render is at worst a cheap signature check, and it is never a
+  // hole on screen. That keeps the time-sliced budget for the common case.
+  const SYNC_RENDER_MAX = 128; // ~2x the rows a tall window can show at once
+
+  function renderNow(rows) {
+    if (!enabled) {
+      return; // we removed them ourselves (removeAllBadges / destroy)
+    }
+    let budget = SYNC_RENDER_MAX;
+    for (const row of rows) {
+      if (budget === 0) {
+        break; // pathological batch: the rest stay queued for the idle flush
+      }
+      const layout = classify(row);
+      if (!row.isConnected || !layout || !layoutEnabled(layout) || findBadge(row)) {
+        continue;
+      }
+      // `fillRow` runs an animation frame after the row is created, so a brand-new
+      // row can reach us empty. With `gDBView` we can still name the sender; on the
+      // scraped fallback we cannot, and drawing a "?" now only to correct it later
+      // would be the very flicker we are removing. Leave those to the idle flush,
+      // which runs after the tree has filled them.
+      if (!senderKnown(row)) {
+        continue;
+      }
+      budget--;
+      // Dequeue *before* decorating: a host that answers `resolveBimi` /
+      // `resolveGravatar` synchronously re-enqueues this row from inside
+      // `decorate` to swap the image in, and that must survive.
+      pending.delete(row);
+      try {
+        decorate(row);
+      } catch (e) {
+        pending.add(row); // the idle flush retries
+      }
+    }
+    dropSelfRecords();
+  }
+
+  function senderKnown(row) {
+    return Boolean(getMsgHdr(row)) || Boolean(authorFrom(null, row));
+  }
+
+  // Discard the mutation records our own DOM writes just queued. They would only
+  // wake another flush to re-check rows we have already finished. Safe because
+  // nothing else runs between our writes and this call: the observer's queue was
+  // drained on entry to the callback, and neither an idle callback nor a
+  // microtask lets Thunderbird's code interleave.
+  function dropSelfRecords() {
+    if (observer) {
+      try {
+        observer.takeRecords();
+      } catch (e) {
+        /* observer gone */
+      }
     }
   }
 
@@ -188,6 +278,7 @@
         break;
       }
     }
+    dropSelfRecords();
     if (pending.size) {
       scheduleFlush();
     }

@@ -236,25 +236,26 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   background: var(--ti-unread-fill, #4aa9ff);
 }
 
-/* "rowTint" style: wash the whole card cell (the visual row) with a translucent
- * colour for unread — a whole-row highlight (Outlook / eM Client style). Reuses
- * the fill style's fixed/iconColor mode + colour (data-ti-fill-mode +
- * --ti-unread-fill). The wash is translucent (color-mix … transparent) so
- * Thunderbird's own selection / hover / alternating-row backgrounds still read
- * through it. Icon-colour mode uses the sender's colour (--ti-row-color, set per
- * cell by the renderer); image icons (BIMI / Gravatar) have no single colour, so
- * they fall back to the fixed colour. */
+/* "rowTint" style: wash the whole card cell (the visual row) for unread — a
+ * whole-row highlight (Outlook / eM Client style). Reuses the fill style's
+ * fixed/iconColor mode + colour, but at the "Background strength" alpha: the
+ * renderer precomputes a #rrggbbaa wash (--ti-unread-fill-wash for fixed;
+ * --ti-row-wash per cell for the sender colour) via washHex(), because CSS
+ * color-mix()'s var() percentage does not resolve in this Gecko. At <100% the
+ * wash is translucent, so Thunderbird's own selection / hover / alternating-row
+ * backgrounds read through it; at 100% it is the exact, opaque colour. Image
+ * icons (BIMI / Gravatar) have no single colour, so they use the fixed wash. */
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="fixed"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread) {
-  background-color: color-mix(in srgb, var(--ti-unread-fill, #4aa9ff) 15%, transparent);
+  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15));
 }
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread:not(.ti-avatar--bimi):not(.ti-avatar--photo)) {
-  background-color: color-mix(in srgb, var(--ti-row-color, var(--ti-unread-fill, #4aa9ff)) 15%, transparent);
+  background-color: var(--ti-row-wash, var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15)));
 }
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--bimi),
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--photo) {
-  background-color: color-mix(in srgb, var(--ti-unread-fill, #4aa9ff) 15%, transparent);
+  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15));
 }

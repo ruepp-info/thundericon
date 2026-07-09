@@ -330,10 +330,10 @@ output {
 /* Row-tint style: wash the whole sample row (fixed color, or the sample's own
    color in icon-color mode) — mirrors the message list's translucent row wash. */
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="fixed"] .preview li:has(> .ti-avatar--unread) {
-  background-color: color-mix(in srgb, var(--ti-unread-fill, #4aa9ff) 15%, transparent);
+  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15));
 }
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"] .preview li:has(> .ti-avatar--unread) {
-  background-color: color-mix(in srgb, var(--ti-row-color, var(--ti-unread-fill, #4aa9ff)) 15%, transparent);
+  background-color: var(--ti-row-wash, var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15)));
 }
 
 /* Custom palette chips */

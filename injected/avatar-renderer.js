@@ -294,6 +294,10 @@
     // fall back to the fixed colour regardless.
     if (layout === "card" && badge.parentNode && badge.parentNode.style) {
       badge.parentNode.style.setProperty("--ti-row-color", desc.background);
+      badge.parentNode.style.setProperty(
+        "--ti-row-wash",
+        washHex(desc.background, settings.unreadRowStrength)
+      );
     }
 
     // Not yet resolved → ask the privileged host. Both run in parallel; negative
@@ -545,6 +549,7 @@
       const cell = badge.parentNode;
       if (cell && cell.style) {
         cell.style.removeProperty("--ti-row-color");
+        cell.style.removeProperty("--ti-row-wash");
       }
       badge.remove();
     }
@@ -566,7 +571,8 @@
     "--ti-unread-glyph-size",
     "--ti-unread-glyph-weight",
     "--ti-unread-fill",
-    "--ti-unread-fill-fg"
+    "--ti-unread-fill-fg",
+    "--ti-unread-fill-wash"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -593,6 +599,17 @@
       return '"\\2022"'; // U+2022 bullet
     }
     return '"' + ch.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
+
+  // Translucent version of a #rrggbb colour → #rrggbbaa, from a 0–100 strength.
+  // Computed here (not via CSS color-mix, whose var() percentage doesn't resolve
+  // in this Gecko) so the "rowTint" strength slider actually takes effect. 100 =
+  // fully opaque (exact colour); lower = a lighter wash.
+  function washHex(hex6, pct) {
+    const h = Core.normalizeHex(hex6) || "#4aa9ff";
+    const p = Number(pct);
+    const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.15;
+    return h + Math.round(frac * 255).toString(16).padStart(2, "0");
   }
 
   function applyConfig(cfg) {
@@ -644,6 +661,10 @@
     const fillColor = Core.normalizeHex(settings.unreadFillColor) || "#4aa9ff";
     rootStyle.setProperty("--ti-unread-fill", fillColor);
     rootStyle.setProperty("--ti-unread-fill-fg", Core.pickForeground(fillColor));
+    rootStyle.setProperty(
+      "--ti-unread-fill-wash",
+      washHex(fillColor, settings.unreadRowStrength)
+    );
     const styleTokens = UNREAD_STYLE_TOKENS[settings.unreadStyle] || UNREAD_STYLE_TOKENS.barFade;
     if (unreadOn) {
       doc.documentElement.dataset.tiUnreadStyle = styleTokens;

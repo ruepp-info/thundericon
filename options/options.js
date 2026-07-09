@@ -35,6 +35,14 @@ function glyphContent(raw) {
   return '"' + ch.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
 }
 
+// Translucent #rrggbb → #rrggbbaa from a 0–100 strength (mirrors the renderer).
+function washHex(hex6, pct) {
+  const h = Core.normalizeHex(hex6) || "#4aa9ff";
+  const p = Number(pct);
+  const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.15;
+  return h + Math.round(frac * 255).toString(16).padStart(2, "0");
+}
+
 const SAMPLES = [
   "Ada Lovelace <ada@analytical.org>",
   "Grace Hopper <grace@navy.mil>",
@@ -172,6 +180,7 @@ function populate() {
   $("unreadGlyphBold").checked = s.unreadGlyphBold === true;
   $("unreadFillMode").value = s.unreadFillMode || "fixed";
   $("unreadFillColor").value = Core.normalizeHex(s.unreadFillColor) || "#4aa9ff";
+  $("unreadRowStrength").value = s.unreadRowStrength || 15;
 
   $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
 
@@ -207,7 +216,7 @@ function wire() {
     "uppercase", "colorMode", "fixedColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
-    "unreadFillMode", "unreadFillColor",
+    "unreadFillMode", "unreadFillColor", "unreadRowStrength",
     "attachmentsAutoExpand",
     "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
@@ -345,6 +354,7 @@ function collectScalars() {
   s.unreadGlyphBold = $("unreadGlyphBold").checked;
   s.unreadFillMode = $("unreadFillMode").value;
   s.unreadFillColor = $("unreadFillColor").value;
+  s.unreadRowStrength = parseInt($("unreadRowStrength").value, 10) || 15;
   s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
@@ -518,6 +528,7 @@ function updateOutputs() {
   $("borderRadiusOut").textContent =
     $("borderRadius").value === "50" ? "circle" : $("borderRadius").value + "%";
   $("unreadGlyphSizeOut").textContent = $("unreadGlyphSize").value + "px";
+  $("unreadRowStrengthOut").textContent = $("unreadRowStrength").value + "%";
 }
 
 function sideEffects() {
@@ -543,6 +554,7 @@ function updateUnreadState() {
   // Both "fill" (icon square) and "rowTint" (whole row) use the same fill
   // color/mode controls; the accent drives the bar/dot/glyph/ring instead.
   const usesFill = style === "fill" || style === "rowTint";
+  const isRow = style === "rowTint"; // background strength only applies to the row wash
   const usesAccent = !usesFill && style !== "fade";
   $("unreadStyle").disabled = !on;
   $("unreadAccentColor").disabled = !on || !usesAccent;
@@ -552,11 +564,13 @@ function updateUnreadState() {
   }
   $("unreadFillMode").disabled = !on || !usesFill;
   $("unreadFillColor").disabled = !on || !usesFill;
+  $("unreadRowStrength").disabled = !on || !isRow;
   $("unreadGroup").classList.toggle("disabled", !on);
   $("unreadColorGroup").hidden = !usesAccent;
   $("unreadWidthGroup").hidden = !hasBar; // width only applies to the bar
   $("unreadGlyphGroup").hidden = !isGlyph; // character options only for the glyph
   $("unreadFillGroup").hidden = !usesFill; // fill color/mode for fill + row tint
+  $("unreadRowStrengthRow").hidden = !isRow; // strength only for the row background
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them
@@ -622,6 +636,7 @@ function applyRootVars() {
   const fillColor = Core.normalizeHex(s.unreadFillColor) || "#4aa9ff";
   root.setProperty("--ti-unread-fill", fillColor);
   root.setProperty("--ti-unread-fill-fg", Core.pickForeground(fillColor));
+  root.setProperty("--ti-unread-fill-wash", washHex(fillColor, s.unreadRowStrength));
   if (s.unreadEmphasis !== false) {
     document.documentElement.dataset.tiUnreadStyle =
       UNREAD_STYLE_TOKENS[s.unreadStyle] || UNREAD_STYLE_TOKENS.bar;
@@ -646,6 +661,7 @@ function renderPreview() {
 
     const li = document.createElement("li");
     li.style.setProperty("--ti-row-color", desc.background); // for the rowTint style
+    li.style.setProperty("--ti-row-wash", washHex(desc.background, state.settings.unreadRowStrength));
     const badge = document.createElement("span");
     badge.className = "ti-avatar ti-avatar--row";
     badge.textContent = desc.initials;

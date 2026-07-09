@@ -213,11 +213,18 @@
               <span>Fixed color</span>
               <input type="color" id="unreadFillColor" />
             </div>
+            <label class="row conditional" id="unreadRowStrengthRow">
+              <span>Background strength <output id="unreadRowStrengthOut"></output></span>
+              <input type="range" id="unreadRowStrength" min="5" max="100" step="5" />
+            </label>
             <p class="hint">
               Colors the icon background (Fill) or the whole row (Colored row
               background) on unread messages. <em>Sender's avatar color</em> uses
               each sender's own color; brand logos (BIMI) and Gravatar photos have
-              no single color, so they use the fixed color.
+              no single color, so they use the fixed color. For the row background,
+              <em>Background strength</em> sets how strong the color is — 100% is
+              exactly your color (but hides Thunderbird's selection highlight),
+              lower is a lighter wash that lets it show through.
             </p>
           </div>
           <p class="hint">

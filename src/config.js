@@ -56,6 +56,7 @@
       // icons — BIMI logos / Gravatar photos — which have no single color).
       unreadFillMode: "fixed", // fixed | iconColor
       unreadFillColor: "#4aa9ff",
+      unreadRowStrength: 15, // % strength of the "rowTint" wash (100 = exact colour)
 
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so

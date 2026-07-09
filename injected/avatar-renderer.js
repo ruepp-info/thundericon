@@ -608,7 +608,7 @@
   function washHex(hex6, pct) {
     const h = Core.normalizeHex(hex6) || "#4aa9ff";
     const p = Number(pct);
-    const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.15;
+    const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.5;
     return h + Math.round(frac * 255).toString(16).padStart(2, "0");
   }
 

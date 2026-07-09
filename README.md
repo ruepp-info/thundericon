@@ -20,7 +20,8 @@ tree, in both **Table** and **Cards** layouts, without blocking the main thread.
 - **Stronger unread indicator (Cards view).** Makes new/unread mail pop far more
   than Thunderbird's default bold — an Outlook/eM Client-style accent bar on the
   leading edge of unread cards and/or fading read messages' avatars, in a color
-  you choose. Especially helpful in dark mode. On by default; pick the style
+  you choose. Especially helpful in dark mode. Off by default (opt-in); enable it
+  and it defaults to a colored whole-row background at 50% strength. Pick the style
   (bar + fade / bar / dot / a single character in your own font, size &amp; weight /
   a filled icon column / a colored whole-row background / ring / fade) and the
   bar width (narrow / medium / wide) in Options. The fill and row-background styles

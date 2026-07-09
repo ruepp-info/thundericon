@@ -37,11 +37,10 @@
 
       // Unread emphasis (Cards layout only) — make new/unread mail stand out
       // more strongly than Thunderbird's default bold, which is hard to see in
-      // dark mode. Pure local styling (no network/privacy cost), so it's on by
-      // default. `unreadStyle` selects the cues: an accent bar on the leading
-      // edge of unread cards and/or fading read messages' avatars.
-      unreadEmphasis: true,
-      unreadStyle: "bar", // barFade | bar | dot | ring | fade
+      // dark mode. Off by default (opt-in); when enabled it defaults to a colored
+      // whole-row background at 50% strength. `unreadStyle` selects the cue.
+      unreadEmphasis: false,
+      unreadStyle: "rowTint", // barFade | bar | dot | glyph | fill | rowTint | ring | fade
       unreadAccentColor: "#4aa9ff", // bar/ring color; bright azure, pops on dark
       unreadBarWidth: "medium", // narrow | medium | wide (accent bar thickness)
       // "glyph" style: a single character drawn where the dot sits, in the accent
@@ -56,7 +55,7 @@
       // icons — BIMI logos / Gravatar photos — which have no single color).
       unreadFillMode: "fixed", // fixed | iconColor
       unreadFillColor: "#4aa9ff",
-      unreadRowStrength: 15, // % strength of the "rowTint" wash (100 = exact colour)
+      unreadRowStrength: 50, // % strength of the "rowTint" wash (100 = exact colour)
 
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so

@@ -247,15 +247,15 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
  * icons (BIMI / Gravatar) have no single colour, so they use the fixed wash. */
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="fixed"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread) {
-  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15));
+  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.5));
 }
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread:not(.ti-avatar--bimi):not(.ti-avatar--photo)) {
-  background-color: var(--ti-row-wash, var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15)));
+  background-color: var(--ti-row-wash, var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.5)));
 }
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--bimi),
 :root[data-ti-unread-style~="rowTint"][data-ti-fill-mode="iconColor"]
   tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--photo) {
-  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.15));
+  background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.5));
 }

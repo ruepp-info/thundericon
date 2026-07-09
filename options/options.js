@@ -39,7 +39,7 @@ function glyphContent(raw) {
 function washHex(hex6, pct) {
   const h = Core.normalizeHex(hex6) || "#4aa9ff";
   const p = Number(pct);
-  const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.15;
+  const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.5;
   return h + Math.round(frac * 255).toString(16).padStart(2, "0");
 }
 
@@ -171,7 +171,7 @@ function populate() {
   $("fixedColor").value = Core.normalizeHex(s.fixedColor) || "#6b7280";
 
   $("unreadEmphasis").checked = s.unreadEmphasis !== false;
-  $("unreadStyle").value = s.unreadStyle || "bar";
+  $("unreadStyle").value = s.unreadStyle || "rowTint";
   $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
   $("unreadBarWidth").value = s.unreadBarWidth || "medium";
   $("unreadGlyph").value = s.unreadGlyph != null ? s.unreadGlyph : "»";
@@ -180,7 +180,7 @@ function populate() {
   $("unreadGlyphBold").checked = s.unreadGlyphBold === true;
   $("unreadFillMode").value = s.unreadFillMode || "fixed";
   $("unreadFillColor").value = Core.normalizeHex(s.unreadFillColor) || "#4aa9ff";
-  $("unreadRowStrength").value = s.unreadRowStrength || 15;
+  $("unreadRowStrength").value = s.unreadRowStrength || 50;
 
   $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
 
@@ -354,7 +354,7 @@ function collectScalars() {
   s.unreadGlyphBold = $("unreadGlyphBold").checked;
   s.unreadFillMode = $("unreadFillMode").value;
   s.unreadFillColor = $("unreadFillColor").value;
-  s.unreadRowStrength = parseInt($("unreadRowStrength").value, 10) || 15;
+  s.unreadRowStrength = parseInt($("unreadRowStrength").value, 10) || 50;
   s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;

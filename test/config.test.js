@@ -76,8 +76,8 @@ test("mergeSettings merges the layouts sub-object", () => {
 
 test("unread-emphasis defaults exist", () => {
   const s = Cfg.DEFAULTS.settings;
-  assert.equal(s.unreadEmphasis, true);
-  assert.equal(s.unreadStyle, "bar");
+  assert.equal(s.unreadEmphasis, false); // opt-in: off by default
+  assert.equal(s.unreadStyle, "rowTint"); // defaults to whole-row background when enabled
   assert.equal(s.unreadAccentColor, "#4aa9ff");
   assert.equal(s.unreadBarWidth, "medium");
   assert.equal(s.unreadGlyph, "»");
@@ -86,7 +86,7 @@ test("unread-emphasis defaults exist", () => {
   assert.ok(s.unreadGlyphFont);
   assert.equal(s.unreadFillMode, "fixed");
   assert.equal(s.unreadFillColor, "#4aa9ff");
-  assert.equal(s.unreadRowStrength, 15);
+  assert.equal(s.unreadRowStrength, 50); // 50% wash by default
 });
 
 test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {
@@ -112,8 +112,8 @@ test("unread-emphasis defaults survive a partial stored settings (existing profi
   // A profile saved before this feature existed won't have the keys; the defaults
   // must still surface so the feature is available on upgrade.
   const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
-  assert.equal(m.settings.unreadEmphasis, true);
-  assert.equal(m.settings.unreadStyle, "bar");
+  assert.equal(m.settings.unreadEmphasis, false);
+  assert.equal(m.settings.unreadStyle, "rowTint");
   assert.equal(m.settings.unreadAccentColor, "#4aa9ff");
   // an explicit override still wins
   const m2 = Cfg.mergeSettings({ settings: { unreadStyle: "ring" } });

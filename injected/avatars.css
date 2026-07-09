@@ -56,9 +56,9 @@
 
 /* Cards view: a tall avatar on the left, the normal 2-line card to its right.
  *
- * Thunderbird's .card-layout is a CSS grid with named areas (sender/subject/
- * icons); changing the cell's display (e.g. to flex) breaks the card's sizing.
- * So we leave the cell as-is and only:
+ * The card cell holds one wrapper (`.card-container` in current Thunderbird) laid
+ * out as a grid; changing the cell's display (e.g. to flex) breaks the card's
+ * sizing. So we leave the cell as-is and only:
  *   1. give the cell a positioning context,
  *   2. indent the card content to reserve a column on the left,
  *   3. absolutely overlay the avatar, vertically centered, in that column.

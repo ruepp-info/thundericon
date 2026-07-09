@@ -64,22 +64,51 @@ function setup() {
   return { window, doc, tbody, authors, folderFlags, readStates };
 }
 
+// Mirror of Thunderbird's `#threadPaneCardTemplate` (mail/base/content/about3Pane.xhtml):
+// a single <td> wrapping `.card-container`. `ThreadCard.fillRow()` writes the sender
+// into `.sender` and the subject into `.thread-card-subject-container > .subject`;
+// it never touches the cell's own children, which is why a card badge survives a
+// refill. Note `card-layout` is a class Thunderbird puts on the <tr> itself, not on
+// any element inside the cell.
+function cardCell(doc, sender) {
+  const td = doc.createElement("td");
+  td.innerHTML = `
+    <div class="card-container">
+      <div class="thread-card-column"><img class="read-status" alt=""></div>
+      <div class="thread-card-column">
+        <div class="thread-card-row">
+          <span class="account-indicator"></span>
+          <span class="sender"></span>
+          <span class="date"></span>
+        </div>
+        <div class="thread-card-dynamic-row">
+          <div class="thread-card-subject-container"><span class="subject"></span></div>
+        </div>
+      </div>
+    </div>`;
+  td.querySelector(".sender").textContent = sender;
+  return td;
+}
+
 function addRow(doc, { index, kind = "row", text = "loading" }) {
   const tr = doc.createElement("tr");
   tr.setAttribute("is", kind === "card" ? "thread-card" : "thread-row");
   tr.index = index;
-  const td = doc.createElement("td");
-  td.className = "correspondentcol-column";
   if (kind === "card") {
-    const card = doc.createElement("div");
-    card.className = "card-layout";
-    card.textContent = text;
-    td.appendChild(card);
+    tr.className = "card-layout"; // as Thunderbird tags the row element
+    tr.appendChild(cardCell(doc, text));
   } else {
+    const td = doc.createElement("td");
+    td.className = "correspondentcol-column";
     td.textContent = text;
+    tr.appendChild(td);
   }
-  tr.appendChild(td);
   return tr;
+}
+
+// The tree filling a card row in place: `senderLine.textContent = …`.
+function fillCard(card, sender) {
+  card.querySelector(".sender").textContent = sender;
 }
 
 function badges(root, selector = ".ti-avatar") {
@@ -197,7 +226,7 @@ test("a card row the tree has not filled yet gets no placeholder badge", async (
   assert.equal(card.querySelector(".ti-avatar"), null, "no badge drawn from nothing");
 
   // Once the tree fills it, the scraped fallback still decorates it.
-  card.querySelector(".card-layout").textContent = "Grace Hopper";
+  fillCard(card, "Grace Hopper");
   await waitFor(() => card.querySelector(".ti-avatar"));
   assert.equal(card.querySelector(".ti-avatar").textContent, "GH");
 });
@@ -284,10 +313,10 @@ test("card rows place the badge in the cell, beside (not inside) the card conten
   const badge = card.querySelector(".ti-avatar");
   assert.ok(badge.classList.contains("ti-avatar--card"));
   assert.equal(badge.textContent, "CV");
-  // Sibling of .card-layout inside the same <td>, inserted first.
+  // Sibling of the card content inside the same <td>, inserted first.
   assert.equal(badge.parentElement.tagName, "TD");
   assert.equal(badge.parentElement.firstElementChild, badge);
-  assert.ok(badge.nextElementSibling.classList.contains("card-layout"));
+  assert.ok(badge.nextElementSibling.classList.contains("card-container"));
   // The card cell exposes the sender colour for the rowTint style.
   assert.match(badge.parentElement.style.getPropertyValue("--ti-row-color"), /^#[0-9a-f]{6}$/);
 });
@@ -391,15 +420,20 @@ test("marking a card read swaps --unread for --read on the same badge", async ()
   });
   const before = card.querySelector(".ti-avatar");
 
-  // Mark read: flip the header bit and rewrite the card text the way Thunderbird
-  // repaints a row on read (fires a childList mutation → re-decoration).
+  // Mark read: flip the header bit and refill the card the way Thunderbird repaints
+  // a row on read (`invalidateRow` → `fillRow` → `senderLine.textContent = …`). The
+  // badge survives that refill, so the marker swap is the only thing that moves —
+  // and it has to move before the paint, or the rowTint background stays lit next
+  // to text Thunderbird has already un-bolded. Microtasks only: no timer, no paint.
   readStates[0] = true;
-  card.querySelector(".card-layout").textContent = "Person";
+  fillCard(card, "Person");
 
-  await waitFor(() => {
-    const b = card.querySelector(".ti-avatar");
-    return b && b.classList.contains("ti-avatar--read");
-  });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.ok(
+    card.querySelector(".ti-avatar").classList.contains("ti-avatar--read"),
+    "read marker applied in the mutation-observer microtask"
+  );
   const after = card.querySelector(".ti-avatar");
   assert.equal(after, before, "same badge node reused");
   assert.ok(!after.classList.contains("ti-avatar--unread"));

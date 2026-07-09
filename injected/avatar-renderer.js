@@ -172,15 +172,22 @@
   //   - In Table layout `ThreadRow.fillRow()` assigns `cell.textContent`, which
   //     deletes the badge sitting in that cell.
   //
-  // Deferring those to the idle flush leaves the rows badge-less for one or more
-  // painted frames — the flicker. Mutation observer callbacks are microtasks, so
-  // they run *before* the paint that the tree's own DOM writes are about to
-  // trigger; drawing the badge from there lands it in the same frame as the row
-  // content it belongs to, and the empty frame never reaches the screen.
+  // Thunderbird also refills rows *in place* — `invalidateRow` on a mark-as-read,
+  // on new mail, on a re-sort — and un-bolds the card's text in the same animation
+  // frame. A badge survives that in Cards layout, but its `--unread`/`--read`
+  // marker (and with it the whole `rowTint` background) has to follow in the same
+  // frame or the row sits tinted next to un-bolded text.
   //
-  // Only badge-less rows take this path. A row that already has one is left to the
-  // idle flush: its render is at worst a cheap signature check, and it is never a
-  // hole on screen. That keeps the time-sliced budget for the common case.
+  // Deferring any of this to the idle flush costs one or more painted frames — the
+  // flicker. Mutation observer callbacks are microtasks, so they run *before* the
+  // paint that the tree's own DOM writes are about to trigger; decorating from
+  // there lands the badge in the same frame as the row content it belongs to.
+  //
+  // So every row a mutation batch touched is decorated here. `decorate` is guarded
+  // by the render signature, so an unchanged row costs one header read plus a
+  // `describe`. This does not move the scroll budget: scrolling makes the tree
+  // build *new* row elements (which this path had to draw anyway) rather than
+  // touching rows that are already on screen.
   const SYNC_RENDER_MAX = 128; // ~2x the rows a tall window can show at once
 
   function renderNow(rows) {
@@ -193,15 +200,16 @@
         break; // pathological batch: the rest stay queued for the idle flush
       }
       const layout = classify(row);
-      if (!row.isConnected || !layout || !layoutEnabled(layout) || findBadge(row)) {
+      if (!row.isConnected || !layout || !layoutEnabled(layout)) {
         continue;
       }
+      const sender = resolveSender(row);
       // `fillRow` runs an animation frame after the row is created, so a brand-new
       // row can reach us empty. With `gDBView` we can still name the sender; on the
       // scraped fallback we cannot, and drawing a "?" now only to correct it later
       // would be the very flicker we are removing. Leave those to the idle flush,
       // which runs after the tree has filled them.
-      if (!senderKnown(row)) {
+      if (!sender.hdr && !sender.author) {
         continue;
       }
       budget--;
@@ -210,16 +218,12 @@
       // `decorate` to swap the image in, and that must survive.
       pending.delete(row);
       try {
-        decorate(row);
+        decorate(row, sender);
       } catch (e) {
         pending.add(row); // the idle flush retries
       }
     }
     dropSelfRecords();
-  }
-
-  function senderKnown(row) {
-    return Boolean(getMsgHdr(row)) || Boolean(authorFrom(null, row));
   }
 
   // Discard the mutation records our own DOM writes just queued. They would only
@@ -301,7 +305,10 @@
     return layout === "card" ? L.cards !== false : L.table !== false;
   }
 
-  function decorate(row) {
+  // `sender` is the optional result of a `resolveSender(row)` the caller already
+  // paid for (renderNow needs it to decide whether the row is drawable yet); the
+  // idle flush passes nothing and we resolve it here.
+  function decorate(row, sender) {
     if (!enabled) {
       return;
     }
@@ -318,8 +325,7 @@
       return;
     }
 
-    const hdr = getMsgHdr(row);
-    const author = authorFrom(hdr, row);
+    const { hdr, author } = sender || resolveSender(row);
     const desc = Core.describe(author, settings, domainColors);
 
     // Unread emphasis (Cards layout only). Read state comes straight off the
@@ -526,11 +532,13 @@
 
   function placeBadge(row, badge, layout) {
     if (layout === "card") {
-      // Put the badge in the card's table cell as a *sibling* of the card
-      // content (not inside .card-layout's grid), so CSS can lay the cell out as
-      // [ avatar | existing 2-line card ] without disturbing the card.
-      const content = row.querySelector(".card-layout");
-      const cell = (content && content.closest("td")) || row.querySelector("td") || row;
+      // A card row is a single <td> holding the cloned card template. Put the badge
+      // in that cell as a *sibling* of the card content, so CSS can lay the cell out
+      // as [ avatar | existing 2-line card ] without restructuring the card itself.
+      // Match on the cell rather than the template's inner classes: those are
+      // Thunderbird internals (`.card-container` today, `.card-layout` once), and a
+      // card row has exactly one cell either way.
+      const cell = row.querySelector("td") || row;
       cell.prepend(badge);
       return;
     }
@@ -545,6 +553,14 @@
   }
 
   /* ---- sender resolution ------------------------------------------------ */
+
+  // Everything a render needs to identify the row's sender, resolved once. `hdr`
+  // is null when the DB view is unavailable, in which case `author` comes from
+  // scraping the visible text — and is "" for a row the tree has not filled yet.
+  function resolveSender(row) {
+    const hdr = getMsgHdr(row);
+    return { hdr, author: authorFrom(hdr, row) };
+  }
 
   function rowIndex(row) {
     if (typeof row.index === "number") {

@@ -57,6 +57,14 @@
       unreadFillColor: "#4aa9ff",
       unreadRowStrength: 50, // % strength of the "rowTint" wash (100 = exact colour)
 
+      // Unread subject color — recolor the subject text of unread messages.
+      // Independent of `unreadEmphasis`/`unreadStyle` above: it combines with any
+      // cue (or none), and unlike them it works in BOTH layouts, because the CSS
+      // keys off Thunderbird's own per-row `data-properties~="unread"` instead of
+      // our avatar's marker class. Opt-in, like every other unread cue.
+      unreadSubjectColorEnabled: false,
+      unreadSubjectColor: "#4aa9ff",
+
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so
       // it's on by default. Handled by the privileged experiment (about:message).

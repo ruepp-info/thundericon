@@ -234,6 +234,32 @@
           </p>
         </div>
       </section>
+
+      <section class="card span2">
+        <h2>Unread subject color (both views)</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="unreadSubjectColorEnabled" />
+          <span>Color the subject of unread messages</span>
+        </label>
+        <p class="hint">
+          Recolors the subject text of unread messages. Works in
+          <strong>both</strong> the Cards and Table layouts, and is independent of
+          the style above — you can combine it with any of them, or use it on its
+          own with <em>Emphasize new / unread mail</em> switched off.
+        </p>
+
+        <div class="subgroup" id="unreadSubjectGroup">
+          <div class="row stack">
+            <span>Subject color</span>
+            <input type="color" id="unreadSubjectColor" />
+          </div>
+          <p class="hint">
+            Selected rows keep Thunderbird's own highlight colors, so the subject
+            stays readable against the selection background. In the Table layout,
+            tagged messages keep their tag color.
+          </p>
+        </div>
+      </section>
     </div>
 
     <!-- Attachments -->

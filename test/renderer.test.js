@@ -403,6 +403,66 @@ test("applyConfig sets the accent color and style tokens on the root", async () 
   assert.equal(doc.documentElement.dataset.tiFillMode, "iconColor");
 });
 
+/* ---- unread subject color (both layouts) ------------------------------ */
+
+// The CSS keys off Thunderbird's own tr[data-properties~="unread"], so there is
+// nothing per-row for the renderer to do; all it owns is the root gate + color.
+
+test("unread subject color sets the root gate and color, and is off by default", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+  // DEFAULT_CONFIG omits the key -> opt-in, so the gate must stay absent.
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, undefined);
+
+  cfg.settings.unreadSubjectColorEnabled = true;
+  cfg.settings.unreadSubjectColor = "#ff8800";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, "on");
+  assert.equal(
+    doc.documentElement.style.getPropertyValue("--ti-unread-subject-color"),
+    "#ff8800"
+  );
+
+  cfg.settings.unreadSubjectColorEnabled = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, undefined);
+});
+
+test("unread subject color is independent of unreadEmphasis but follows the master switch", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.unreadSubjectColorEnabled = true;
+
+  // Works on its own, with every avatar cue switched off.
+  cfg.settings.unreadEmphasis = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, undefined);
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, "on");
+
+  // But "Show avatars" off must take it down too: it is not tied to a badge
+  // class, so nothing else would stop it colouring the list.
+  cfg.settings.enabled = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, undefined);
+});
+
+test("destroy() clears the unread subject gate and color", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.unreadSubjectColorEnabled = true;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, "on");
+
+  window.__thundericon.destroy();
+  assert.equal(doc.documentElement.dataset.tiUnreadSubject, undefined);
+  assert.equal(
+    doc.documentElement.style.getPropertyValue("--ti-unread-subject-color"),
+    ""
+  );
+});
+
 /* ---- BIMI logo branch ------------------------------------------------- */
 
 function bimiConfig() {

@@ -259,3 +259,43 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   tr[is="thread-card"] td:has(> .ti-avatar--unread.ti-avatar--photo) {
   background-color: var(--ti-unread-fill-wash, rgba(74, 169, 255, 0.5));
 }
+
+/* Unread subject colour — BOTH layouts.
+ *
+ * Orthogonal to the cue styles above: it combines with any of them (or none), so
+ * it gates on its own root attribute, data-ti-unread-subject, rather than on a
+ * data-ti-unread-style token.
+ *
+ * Unlike the cues, this cannot key off our own badge. In Table view the avatar
+ * lives in the correspondent cell, not the subject cell, so `td:has(.ti-avatar--
+ * unread)` would never reach the subject. Instead we use Thunderbird's own
+ * per-row state attribute — tr[data-properties~="unread"] — which is what
+ * threadPane.css itself keys the default bold off, and which is present in both
+ * layouts. It also means scraped rows (no gDBView → no marker class) still get
+ * coloured. Like everything else here it is internal DOM, not stable
+ * WebExtension API; verify on major Thunderbird updates:
+ *
+ *   Cards -> .thread-card-subject-container > .subject
+ *   Table -> td.subjectcol-column > .thread-container > .subject-line > span
+ *            (the <img> sibling in .subject-line is the message-state icon —
+ *            target the span, or the icon inherits the colour via currentColor)
+ *
+ * Exclusions, both mirroring Thunderbird's own cascade:
+ *   .selected  — TB paints selected rows with a selection background and its own
+ *                contrast colour; ours could be unreadable against it.
+ *   tagged (Table only) — TB deliberately lets a tag's colour win over the unread
+ *                colour there (`.table-layout[data-properties~="unread"]:not(
+ *                [data-properties~="tagged"])`), so we stay out of its way. Cards
+ *                show tags as pills and never tint the subject, so no exclusion.
+ *
+ * avatars.css is loaded as an AUTHOR sheet after threadPane.css, and these rules
+ * target the subject element directly (TB sets `color` on the <tr>, which only
+ * reaches the subject by inheritance), so they win without !important. */
+:root[data-ti-unread-subject]
+  tr[is="thread-card"][data-properties~="unread"]:not(.selected)
+  .thread-card-subject-container > .subject,
+:root[data-ti-unread-subject]
+  tr[is="thread-row"][data-properties~="unread"]:not(.selected):not([data-properties~="tagged"])
+  td.subjectcol-column .subject-line > span {
+  color: var(--ti-unread-subject-color, #4aa9ff);
+}

@@ -253,6 +253,23 @@ output {
   color: var(--muted);
 }
 
+/* Subject sample, rendered only while the unread subject color is on. Unread is
+   bold here just as Thunderbird bolds it in the real list, so the color choice is
+   previewed against the same weight it will actually have. */
+.preview .subject {
+  display: block;
+  margin-block-start: 2px;
+  font-size: 12px;
+}
+
+.preview .subject.unread {
+  font-weight: 700;
+}
+
+:root[data-ti-unread-subject] .preview .subject.unread {
+  color: var(--ti-unread-subject-color, #4aa9ff);
+}
+
 /* Preview mirrors the Cards-view unread emphasis so its effect is visible here.
    applyRootVars() sets --ti-unread-accent + data-ti-unread-style on :root and
    renderPreview() tags alternating samples .ti-avatar--unread / --read (the same

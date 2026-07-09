@@ -89,6 +89,22 @@ test("unread-emphasis defaults exist", () => {
   assert.equal(s.unreadRowStrength, 50); // 50% wash by default
 });
 
+test("unread subject color defaults exist and survive a partial stored settings", () => {
+  const s = Cfg.DEFAULTS.settings;
+  assert.equal(s.unreadSubjectColorEnabled, false); // opt-in: off by default
+  assert.equal(s.unreadSubjectColor, "#4aa9ff");
+  // A profile saved before this feature existed must still surface the defaults.
+  const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
+  assert.equal(m.settings.unreadSubjectColorEnabled, false);
+  assert.equal(m.settings.unreadSubjectColor, "#4aa9ff");
+  // an explicit override still wins
+  const m2 = Cfg.mergeSettings({
+    settings: { unreadSubjectColorEnabled: true, unreadSubjectColor: "#ff8800" }
+  });
+  assert.equal(m2.settings.unreadSubjectColorEnabled, true);
+  assert.equal(m2.settings.unreadSubjectColor, "#ff8800");
+});
+
 test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {
   const s = Cfg.DEFAULTS.settings;
   assert.equal(s.colorMode, "hslHash");

@@ -52,6 +52,16 @@ const SAMPLES = [
   "Linus Torvalds <linus@kernel.org>"
 ];
 
+// Subject lines for the preview, shown only while the unread subject color is on.
+const SAMPLE_SUBJECTS = [
+  "Notes on the Analytical Engine",
+  "Re: compiler progress",
+  "On computable numbers",
+  "Trajectory checks for Friendship 7",
+  "Apollo guidance: priority display",
+  "Re: [PATCH] mm: fix page fault path"
+];
+
 let state = { settings: {}, domainColors: {} };
 let domainRows = []; // [{ domain, color }]
 let saveTimer = null;
@@ -181,6 +191,8 @@ function populate() {
   $("unreadFillMode").value = s.unreadFillMode || "fixed";
   $("unreadFillColor").value = Core.normalizeHex(s.unreadFillColor) || "#4aa9ff";
   $("unreadRowStrength").value = s.unreadRowStrength || 50;
+  $("unreadSubjectColorEnabled").checked = s.unreadSubjectColorEnabled === true;
+  $("unreadSubjectColor").value = Core.normalizeHex(s.unreadSubjectColor) || "#4aa9ff";
 
   $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
 
@@ -217,6 +229,7 @@ function wire() {
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
     "unreadFillMode", "unreadFillColor", "unreadRowStrength",
+    "unreadSubjectColorEnabled", "unreadSubjectColor",
     "attachmentsAutoExpand",
     "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
@@ -355,6 +368,8 @@ function collectScalars() {
   s.unreadFillMode = $("unreadFillMode").value;
   s.unreadFillColor = $("unreadFillColor").value;
   s.unreadRowStrength = parseInt($("unreadRowStrength").value, 10) || 50;
+  s.unreadSubjectColorEnabled = $("unreadSubjectColorEnabled").checked;
+  s.unreadSubjectColor = $("unreadSubjectColor").value;
   s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
@@ -538,6 +553,7 @@ function sideEffects() {
 
   updateEnabledState();
   updateUnreadState();
+  updateUnreadSubjectState();
   updateBimiState();
   updateGravatarState();
   applyRootVars();
@@ -571,6 +587,15 @@ function updateUnreadState() {
   $("unreadGlyphGroup").hidden = !isGlyph; // character options only for the glyph
   $("unreadFillGroup").hidden = !usesFill; // fill color/mode for fill + row tint
   $("unreadRowStrengthRow").hidden = !isRow; // strength only for the row background
+}
+
+// The unread subject color is its own feature (it applies to both layouts and
+// combines with any cue style), so it hangs off its own switch rather than
+// "Emphasize new / unread mail" — only the color picker depends on it.
+function updateUnreadSubjectState() {
+  const on = $("unreadSubjectColorEnabled").checked;
+  $("unreadSubjectColor").disabled = !on;
+  $("unreadSubjectGroup").classList.toggle("disabled", !on);
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them
@@ -646,6 +671,18 @@ function applyRootVars() {
     delete document.documentElement.dataset.tiUnreadStyle;
     delete document.documentElement.dataset.tiFillMode;
   }
+
+  // Same for the unread subject color, so the preview's subject line shows it.
+  // Independent of unreadEmphasis, exactly as in the renderer.
+  root.setProperty(
+    "--ti-unread-subject-color",
+    Core.normalizeHex(s.unreadSubjectColor) || "#4aa9ff"
+  );
+  if (s.unreadSubjectColorEnabled === true) {
+    document.documentElement.dataset.tiUnreadSubject = "on";
+  } else {
+    delete document.documentElement.dataset.tiUnreadSubject;
+  }
 }
 
 function renderPreview() {
@@ -656,8 +693,12 @@ function renderPreview() {
   // visible right here. The badge marker classes match the renderer's; the
   // preview-scoped rules in options.css gate on the same data-ti-unread-style.
   const unreadOn = state.settings.unreadEmphasis !== false;
+  // The subject sample only appears while the subject color is on: that switch is
+  // the only control affecting it, so otherwise it would just pad the preview.
+  const subjectOn = state.settings.unreadSubjectColorEnabled === true;
   SAMPLES.forEach((author, i) => {
     const desc = Core.describe(author, state.settings, state.domainColors);
+    const unread = i % 2 === 0;
 
     const li = document.createElement("li");
     li.style.setProperty("--ti-row-color", desc.background); // for the rowTint style
@@ -668,7 +709,6 @@ function renderPreview() {
     badge.style.setProperty("--ti-color", desc.background);
     badge.style.setProperty("--ti-fg", desc.foreground);
     if (unreadOn) {
-      const unread = i % 2 === 0;
       badge.classList.toggle("ti-avatar--unread", unread);
       badge.classList.toggle("ti-avatar--read", !unread);
     }
@@ -681,6 +721,16 @@ function renderPreview() {
     addr.className = "addr";
     addr.textContent = desc.email || "";
     text.append(name, addr);
+
+    if (subjectOn) {
+      // Marked on the subject itself, not the badge: unlike the cue styles this
+      // works with "Emphasize new / unread mail" off, so it can't lean on the
+      // badge's .ti-avatar--unread class.
+      const subject = document.createElement("span");
+      subject.className = unread ? "subject unread" : "subject";
+      subject.textContent = SAMPLE_SUBJECTS[i % SAMPLE_SUBJECTS.length];
+      text.append(subject);
+    }
 
     li.append(badge, text);
     ul.append(li);

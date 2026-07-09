@@ -572,7 +572,8 @@
     "--ti-unread-glyph-weight",
     "--ti-unread-fill",
     "--ti-unread-fill-fg",
-    "--ti-unread-fill-wash"
+    "--ti-unread-fill-wash",
+    "--ti-unread-subject-color"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -675,6 +676,22 @@
       delete doc.documentElement.dataset.tiFillMode;
     }
 
+    // Unread subject colour (both layouts). Orthogonal to the cues above — it
+    // combines with any of them — so it gets its own root attribute instead of a
+    // style token, and it is not gated on `unreadOn`. It IS gated on the master
+    // switch: the CSS keys off Thunderbird's own tr[data-properties~="unread"]
+    // rather than a badge class, so unlike the cues it would survive avatars
+    // being turned off (removeAllBadges takes the badges, not the rows).
+    rootStyle.setProperty(
+      "--ti-unread-subject-color",
+      Core.normalizeHex(settings.unreadSubjectColor) || "#4aa9ff"
+    );
+    if (settings.enabled !== false && settings.unreadSubjectColorEnabled === true) {
+      doc.documentElement.dataset.tiUnreadSubject = "on";
+    } else {
+      delete doc.documentElement.dataset.tiUnreadSubject;
+    }
+
     // Force a full recompute: color mode / initials may have changed.
     rowKeys = new WeakMap();
     enabled = settings.enabled !== false;
@@ -727,6 +744,7 @@
         }
         delete doc.documentElement.dataset.tiUnreadStyle;
         delete doc.documentElement.dataset.tiFillMode;
+        delete doc.documentElement.dataset.tiUnreadSubject;
         rowKeys = new WeakMap();
         pending = new Set();
         bimiByMsg = new Map();

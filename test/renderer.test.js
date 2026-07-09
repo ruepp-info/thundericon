@@ -385,6 +385,15 @@ test("applyConfig sets the accent color and style tokens on the root", async () 
   assert.equal(rootStyle.getPropertyValue("--ti-unread-glyph"), '"★"');
   assert.equal(rootStyle.getPropertyValue("--ti-unread-glyph-size"), "20px");
   assert.equal(rootStyle.getPropertyValue("--ti-unread-glyph-weight"), "700");
+
+  cfg.settings.unreadStyle = "fill";
+  cfg.settings.unreadFillMode = "iconColor";
+  cfg.settings.unreadFillColor = "#123456";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiUnreadStyle, "fill");
+  assert.equal(doc.documentElement.dataset.tiFillMode, "iconColor");
+  assert.equal(rootStyle.getPropertyValue("--ti-unread-fill"), "#123456");
+  assert.ok(rootStyle.getPropertyValue("--ti-unread-fill-fg"));
 });
 
 /* ---- BIMI logo branch ------------------------------------------------- */

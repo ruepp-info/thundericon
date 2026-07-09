@@ -165,6 +165,7 @@
               <option value="barFade">Accent bar + fade read</option>
               <option value="dot">Colored dot</option>
               <option value="glyph">Single character</option>
+              <option value="fill">Fill icon background</option>
               <option value="ring">Ring around unread avatar</option>
               <option value="fade">Fade read messages</option>
             </select>
@@ -199,10 +200,29 @@
               <span>Bold</span>
             </label>
           </div>
+          <div class="conditional" id="unreadFillGroup">
+            <label class="row">
+              <span>Color source</span>
+              <select id="unreadFillMode">
+                <option value="fixed">Fixed color</option>
+                <option value="iconColor">Sender's avatar color</option>
+              </select>
+            </label>
+            <div class="row stack">
+              <span>Fixed color</span>
+              <input type="color" id="unreadFillColor" />
+            </div>
+            <p class="hint">
+              Fills the avatar background on unread messages. <em>Sender's avatar
+              color</em> keeps each sender's own color for initials; brand logos
+              (BIMI) and Gravatar photos have no single color, so they use the
+              fixed color.
+            </p>
+          </div>
           <p class="hint">
             The accent color is used for the bar, dot, character and ring; the
-            width sets the bar's thickness. The <em>Fade read</em> style uses none
-            of these.
+            width sets the bar's thickness. The <em>Fill</em> and <em>Fade read</em>
+            styles use their own settings instead.
           </p>
         </div>
       </section>

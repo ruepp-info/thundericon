@@ -201,3 +201,33 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   tr[is="thread-card"] .ti-avatar--unread {
   box-shadow: 0 0 0 2px var(--ti-unread-accent, #4aa9ff);
 }
+
+/* "fill" style: fill the unread avatar's background instead of drawing a marker.
+ * Fixed mode fills every unread avatar (initials and image icons) with the chosen
+ * colour and recolours the initials for legibility (--ti-unread-fill-fg, computed
+ * for contrast by the renderer). Icon-colour mode leaves initials on their own
+ * per-sender colour and only fills image icons (BIMI / Gravatar) — which have no
+ * single colour — with the fixed colour. The two-attribute selectors easily beat
+ * the .ti-avatar--bimi/--photo `background: transparent`, so no !important. */
+
+/* Fill the WHOLE square the icon occupies, not just its rounded silhouette: drop
+ * the corner radius for unread cards so the colour covers the full badge box (the
+ * badge is size*1.7 square in Cards view). Applies in both fill modes. */
+:root[data-ti-unread-style~="fill"]
+  tr[is="thread-card"] .ti-avatar--unread {
+  border-radius: 0;
+}
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"]
+  tr[is="thread-card"] .ti-avatar--unread {
+  background-color: var(--ti-unread-fill, #4aa9ff);
+}
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"]
+  tr[is="thread-card"] .ti-avatar--unread:not(.ti-avatar--bimi):not(.ti-avatar--photo) {
+  color: var(--ti-unread-fill-fg, #ffffff);
+}
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="iconColor"]
+  tr[is="thread-card"] .ti-avatar--unread.ti-avatar--bimi,
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="iconColor"]
+  tr[is="thread-card"] .ti-avatar--unread.ti-avatar--photo {
+  background-color: var(--ti-unread-fill, #4aa9ff);
+}

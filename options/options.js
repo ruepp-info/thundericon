@@ -168,6 +168,8 @@ function populate() {
   $("unreadGlyphFont").value = s.unreadGlyphFont || Cfg.DEFAULTS.settings.unreadGlyphFont;
   $("unreadGlyphSize").value = s.unreadGlyphSize || 14;
   $("unreadGlyphBold").checked = s.unreadGlyphBold === true;
+  $("unreadFillMode").value = s.unreadFillMode || "fixed";
+  $("unreadFillColor").value = Core.normalizeHex(s.unreadFillColor) || "#4aa9ff";
 
   $("attachmentsAutoExpand").checked = s.attachmentsAutoExpand !== false;
 
@@ -203,6 +205,7 @@ function wire() {
     "uppercase", "colorMode", "fixedColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
+    "unreadFillMode", "unreadFillColor",
     "attachmentsAutoExpand",
     "bimiEnabled", "bimiBaseDomainOnly",
     "bimiRefreshHours", "bimiDohProvider", "bimiDohCustomUrl",
@@ -338,6 +341,8 @@ function collectScalars() {
   s.unreadGlyphFont = $("unreadGlyphFont").value.trim() || Cfg.DEFAULTS.settings.unreadGlyphFont;
   s.unreadGlyphSize = parseInt($("unreadGlyphSize").value, 10) || 14;
   s.unreadGlyphBold = $("unreadGlyphBold").checked;
+  s.unreadFillMode = $("unreadFillMode").value;
+  s.unreadFillColor = $("unreadFillColor").value;
   s.attachmentsAutoExpand = $("attachmentsAutoExpand").checked;
   s.bimiEnabled = $("bimiEnabled").checked;
   s.bimiBaseDomainOnly = $("bimiBaseDomainOnly").checked;
@@ -533,16 +538,23 @@ function updateUnreadState() {
   const style = $("unreadStyle").value;
   const hasBar = style === "bar" || style === "barFade";
   const isGlyph = style === "glyph";
+  const isFill = style === "fill";
+  // The accent color drives the bar/dot/glyph/ring; the fill and fade styles use
+  // their own settings, so the accent picker doesn't apply to them.
+  const usesAccent = !isFill && style !== "fade";
   $("unreadStyle").disabled = !on;
-  $("unreadAccentColor").disabled = !on || style === "fade";
+  $("unreadAccentColor").disabled = !on || !usesAccent;
   $("unreadBarWidth").disabled = !on || !hasBar;
   for (const id of ["unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold"]) {
     $(id).disabled = !on || !isGlyph;
   }
+  $("unreadFillMode").disabled = !on || !isFill;
+  $("unreadFillColor").disabled = !on || !isFill;
   $("unreadGroup").classList.toggle("disabled", !on);
-  $("unreadColorGroup").hidden = style === "fade";
+  $("unreadColorGroup").hidden = !usesAccent;
   $("unreadWidthGroup").hidden = !hasBar; // width only applies to the bar
   $("unreadGlyphGroup").hidden = !isGlyph; // character options only for the glyph
+  $("unreadFillGroup").hidden = !isFill; // fill options only for the fill style
 }
 
 // The per-view toggles only matter when the master switch is on, so gray them
@@ -605,11 +617,17 @@ function applyRootVars() {
   root.setProperty("--ti-unread-glyph-font", s.unreadGlyphFont || "inherit");
   root.setProperty("--ti-unread-glyph-size", (Number(s.unreadGlyphSize) || 14) + "px");
   root.setProperty("--ti-unread-glyph-weight", s.unreadGlyphBold ? "700" : "400");
+  const fillColor = Core.normalizeHex(s.unreadFillColor) || "#4aa9ff";
+  root.setProperty("--ti-unread-fill", fillColor);
+  root.setProperty("--ti-unread-fill-fg", Core.pickForeground(fillColor));
   if (s.unreadEmphasis !== false) {
     document.documentElement.dataset.tiUnreadStyle =
       UNREAD_STYLE_TOKENS[s.unreadStyle] || UNREAD_STYLE_TOKENS.bar;
+    document.documentElement.dataset.tiFillMode =
+      s.unreadFillMode === "iconColor" ? "iconColor" : "fixed";
   } else {
     delete document.documentElement.dataset.tiUnreadStyle;
+    delete document.documentElement.dataset.tiFillMode;
   }
 }
 

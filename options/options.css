@@ -304,6 +304,17 @@ output {
   box-shadow: 0 0 0 2px var(--ti-unread-accent, #4aa9ff);
 }
 
+/* Fill style: square off the unread sample badges so the fill covers the whole
+   box; fixed mode recolours them; icon-colour mode leaves initials on their own
+   colour (the preview has no image badges). */
+:root[data-ti-unread-style~="fill"] .preview .ti-avatar--unread {
+  border-radius: 0;
+}
+:root[data-ti-unread-style~="fill"][data-ti-fill-mode="fixed"] .preview .ti-avatar--unread {
+  background-color: var(--ti-unread-fill, #4aa9ff);
+  color: var(--ti-unread-fill-fg, #ffffff);
+}
+
 /* Custom palette chips */
 .chips {
   display: flex;

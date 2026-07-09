@@ -552,7 +552,9 @@
     "--ti-unread-glyph",
     "--ti-unread-glyph-font",
     "--ti-unread-glyph-size",
-    "--ti-unread-glyph-weight"
+    "--ti-unread-glyph-weight",
+    "--ti-unread-fill",
+    "--ti-unread-fill-fg"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -561,6 +563,7 @@
     bar: "bar",
     dot: "dot",
     glyph: "glyph",
+    fill: "fill",
     ring: "ring",
     fade: "fade"
   };
@@ -621,11 +624,21 @@
       "--ti-unread-glyph-weight",
       settings.unreadGlyphBold ? "700" : "400"
     );
+    // "fill" style: fill the unread avatar's background. The fixed color is used
+    // directly (and behind image icons); its legible foreground is precomputed for
+    // the initials. The mode ("fixed"|"iconColor") is a root attribute the CSS
+    // pairs with the "fill" token.
+    const fillColor = Core.normalizeHex(settings.unreadFillColor) || "#4aa9ff";
+    rootStyle.setProperty("--ti-unread-fill", fillColor);
+    rootStyle.setProperty("--ti-unread-fill-fg", Core.pickForeground(fillColor));
     const styleTokens = UNREAD_STYLE_TOKENS[settings.unreadStyle] || UNREAD_STYLE_TOKENS.barFade;
     if (unreadOn) {
       doc.documentElement.dataset.tiUnreadStyle = styleTokens;
+      doc.documentElement.dataset.tiFillMode =
+        settings.unreadFillMode === "iconColor" ? "iconColor" : "fixed";
     } else {
       delete doc.documentElement.dataset.tiUnreadStyle;
+      delete doc.documentElement.dataset.tiFillMode;
     }
 
     // Force a full recompute: color mode / initials may have changed.
@@ -679,6 +692,7 @@
           rootStyle.removeProperty(v);
         }
         delete doc.documentElement.dataset.tiUnreadStyle;
+        delete doc.documentElement.dataset.tiFillMode;
         rowKeys = new WeakMap();
         pending = new Set();
         bimiByMsg = new Map();

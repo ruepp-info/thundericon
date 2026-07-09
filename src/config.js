@@ -50,6 +50,12 @@
       unreadGlyphFont: "system-ui, -apple-system, 'Segoe UI', sans-serif",
       unreadGlyphSize: 14, // px
       unreadGlyphBold: false,
+      // "fill" style: fill the unread avatar's background instead of drawing a
+      // marker. unreadFillMode = fixed (the chosen color for everyone) or iconColor
+      // (each sender's own avatar color for initials; the fixed color for image
+      // icons — BIMI logos / Gravatar photos — which have no single color).
+      unreadFillMode: "fixed", // fixed | iconColor
+      unreadFillColor: "#4aa9ff",
 
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so

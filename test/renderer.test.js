@@ -593,6 +593,21 @@ test("list colour: fixed mode sets --ti-list-bg/-fg + the gate, off by default",
   assert.equal(doc.documentElement.dataset.tiListColor, undefined);
 });
 
+test("list colour: brightness lightens/darkens the resolved background", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.listColorEnabled = true;
+  cfg.settings.listColorMode = "fixed";
+  cfg.settings.listBackgroundColor = "#000000";
+  cfg.settings.listBrightness = 50; // lighten black halfway toward white
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-list-bg"), "#808080");
+
+  cfg.settings.listBrightness = 0; // neutral leaves it exact
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-list-bg"), "#000000");
+});
+
 test("list colour follows the master switch", async () => {
   const { window, doc } = setup();
   const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));

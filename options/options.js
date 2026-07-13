@@ -184,6 +184,7 @@ function populate() {
   $("listColorMode").value = s.listColorMode || "fixed";
   $("listBackgroundColor").value = Core.normalizeHex(s.listBackgroundColor) || "#ffffff";
   $("listTextColor").value = Core.normalizeHex(s.listTextColor) || "#000000";
+  $("listBrightness").value = Number.isFinite(s.listBrightness) ? s.listBrightness : 0;
   $("listSelectionEnabled").checked = s.listSelectionEnabled === true;
   $("listSelectionColor").value = Core.normalizeHex(s.listSelectionColor) || "#3574f0";
   $("listSelectionTextColor").value = Core.normalizeHex(s.listSelectionTextColor) || "#ffffff";
@@ -235,6 +236,7 @@ function wire() {
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor",
     "listColorEnabled", "listColorMode", "listBackgroundColor", "listTextColor",
+    "listBrightness",
     "listSelectionEnabled", "listSelectionColor", "listSelectionTextColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
@@ -371,6 +373,7 @@ function collectScalars() {
   s.listColorMode = $("listColorMode").value;
   s.listBackgroundColor = $("listBackgroundColor").value;
   s.listTextColor = $("listTextColor").value;
+  s.listBrightness = parseInt($("listBrightness").value, 10) || 0;
   s.listSelectionEnabled = $("listSelectionEnabled").checked;
   s.listSelectionColor = $("listSelectionColor").value;
   s.listSelectionTextColor = $("listSelectionTextColor").value;
@@ -561,6 +564,9 @@ function updateOutputs() {
     $("borderRadius").value === "50" ? "circle" : $("borderRadius").value + "%";
   $("unreadGlyphSizeOut").textContent = $("unreadGlyphSize").value + "px";
   $("unreadRowStrengthOut").textContent = $("unreadRowStrength").value + "%";
+  const b = parseInt($("listBrightness").value, 10) || 0;
+  $("listBrightnessOut").textContent =
+    b === 0 ? "unchanged" : (b > 0 ? "+" : "") + b + "%";
 }
 
 function sideEffects() {
@@ -587,6 +593,7 @@ function updateListColorState() {
   $("listColorMode").disabled = !on;
   $("listBackgroundColor").disabled = !on || !fixed;
   $("listTextColor").disabled = !on || !fixed;
+  $("listBrightness").disabled = !on;
   $("listColorGroup").classList.toggle("disabled", !on);
   $("listFixedGroup").hidden = !fixed;
 
@@ -726,7 +733,11 @@ function applyRootVars() {
   // folder pane to sample, so "Match folder pane" can't be previewed here; it
   // takes effect live in the real message list. Mirrors the renderer's gate.
   if (s.listColorEnabled === true && s.listColorMode !== "folderPane") {
-    root.setProperty("--ti-list-bg", Core.normalizeHex(s.listBackgroundColor) || "#ffffff");
+    const listBg = Core.adjustBrightness(
+      Core.normalizeHex(s.listBackgroundColor) || "#ffffff",
+      s.listBrightness
+    );
+    root.setProperty("--ti-list-bg", listBg);
     root.setProperty("--ti-list-fg", Core.normalizeHex(s.listTextColor) || "#000000");
     document.documentElement.dataset.tiListColor = "on";
   } else {

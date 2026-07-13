@@ -177,10 +177,17 @@
               <input type="color" id="listTextColor" />
             </div>
           </div>
+          <label class="row">
+            <span>Lighten / darken background <output id="listBrightnessOut"></output></span>
+            <input type="range" id="listBrightness" min="-100" max="100" step="5" />
+          </label>
           <p class="hint">
-            <em>Match folder pane</em> copies the current colors of the folder /
-            account tree on the left and refreshes when you switch between light and
-            dark mode. (Not shown in the preview above — it takes effect live in the
+            The slider optionally shifts the background lighter (right) or darker
+            (left) — the middle leaves it unchanged. Handy with <em>Match folder
+            pane</em>, which copies the folder / account tree's current colors (and
+            refreshes on light/dark switches): a small shift keeps the list distinct
+            from the folder tree it borrows its color from. (<em>Match folder
+            pane</em> isn't shown in the preview above — it takes effect live in the
             message list.)
           </p>
         </div>

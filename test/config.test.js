@@ -128,6 +128,13 @@ test("message-list colour defaults exist and survive a partial stored settings",
   assert.equal(m2.settings.listColorMode, "folderPane");
   assert.equal(m2.settings.listBackgroundColor, "#101010");
   assert.equal(m2.settings.listTextColor, "#eeeeee");
+  // Brightness defaults to 0 (no change) and an override survives.
+  assert.equal(Cfg.DEFAULTS.settings.listBrightness, 0);
+  assert.equal(m.settings.listBrightness, 0);
+  assert.equal(
+    Cfg.mergeSettings({ settings: { listBrightness: -30 } }).settings.listBrightness,
+    -30
+  );
 });
 
 test("selected-message colour defaults exist and survive a partial stored settings", () => {

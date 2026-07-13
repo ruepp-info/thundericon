@@ -98,6 +98,23 @@ test("normalizeHex accepts shorthand and rejects garbage", () => {
   assert.equal(C.normalizeHex(null), null);
 });
 
+test("adjustBrightness lightens/darkens hex and rgb, preserving alpha", () => {
+  // 0 (or unparseable / non-finite) leaves the colour untouched.
+  assert.equal(C.adjustBrightness("#123456", 0), "#123456");
+  assert.equal(C.adjustBrightness("not-a-color", 50), "not-a-color");
+  assert.equal(C.adjustBrightness("#123456", NaN), "#123456");
+  // Lighten mixes toward white, darken toward black (symmetric at ±50 from mid).
+  assert.equal(C.adjustBrightness("#000000", 50), "#808080");
+  assert.equal(C.adjustBrightness("#ffffff", -50), "#808080");
+  // Extremes (and clamping past ±100) hit pure white / black.
+  assert.equal(C.adjustBrightness("#336699", 100), "#ffffff");
+  assert.equal(C.adjustBrightness("#336699", 200), "#ffffff");
+  assert.equal(C.adjustBrightness("#336699", -100), "#000000");
+  // rgb() input (as getComputedStyle yields) → hex out; rgba keeps its alpha.
+  assert.equal(C.adjustBrightness("rgb(0, 0, 0)", 50), "#808080");
+  assert.equal(C.adjustBrightness("rgba(0, 0, 0, 0.5)", 50), "rgba(128, 128, 128, 0.5)");
+});
+
 test("describe bundles initials + colors + parsed identity", () => {
   const d = C.describe("Ada Lovelace <ada@analytical.org>", NEUTRAL, {});
   assert.equal(d.initials, "AL");

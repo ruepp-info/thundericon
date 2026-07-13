@@ -74,6 +74,10 @@
       listColorMode: "fixed", // fixed | folderPane
       listBackgroundColor: "#ffffff",
       listTextColor: "#000000",
+      // Lighten (+) / darken (-) the list background, -100…100. 0 = no change
+      // (so it's optional). Applies in BOTH modes — most useful with "folderPane"
+      // to keep the list distinct from the folder pane it copies its colour from.
+      listBrightness: 0,
 
       // Selected-message colour override (both layouts). Independent of the two
       // colours above (someone may want only a custom selection colour) — useful

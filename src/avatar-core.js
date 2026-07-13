@@ -238,6 +238,63 @@
     return L > 0.55 ? "#1f2933" : "#ffffff";
   }
 
+  /** Parse a hex ("#abc"/"#aabbcc") or rgb()/rgba() string into {r,g,b,a}. The
+   *  rgb() forms are needed because folder-pane colours come from getComputedStyle,
+   *  which resolves to "rgb(…)" / "rgba(…)". Returns null if unparseable. */
+  function parseColor(value) {
+    if (typeof value !== "string") {
+      return null;
+    }
+    const hex = normalizeHex(value);
+    if (hex) {
+      return {
+        r: parseInt(hex.slice(1, 3), 16),
+        g: parseInt(hex.slice(3, 5), 16),
+        b: parseInt(hex.slice(5, 7), 16),
+        a: null
+      };
+    }
+    const m = value.trim().match(/^rgba?\(([^)]+)\)$/i);
+    if (m) {
+      const parts = m[1].split(/[,\s/]+/).filter(Boolean);
+      const r = parseFloat(parts[0]);
+      const g = parseFloat(parts[1]);
+      const b = parseFloat(parts[2]);
+      const a = parts.length >= 4 ? parseFloat(parts[3]) : null;
+      if ([r, g, b].every(Number.isFinite)) {
+        return { r, g, b, a: a != null && Number.isFinite(a) ? a : null };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Lighten or darken a colour by `amount` (-100…100). 0 (or unparseable input)
+   * returns the colour unchanged. Positive mixes toward white, negative toward
+   * black — the standard tint/shade, so it works on any hue. Preserves an alpha
+   * channel (returns rgba); otherwise returns "#rrggbb".
+   */
+  function adjustBrightness(color, amount) {
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt === 0) {
+      return color;
+    }
+    const c = parseColor(color);
+    if (!c) {
+      return color;
+    }
+    const p = Math.max(-100, Math.min(100, amt)) / 100;
+    const mix = (ch) => (p > 0 ? ch + (255 - ch) * p : ch * (1 + p));
+    const clamp = (n) => Math.max(0, Math.min(255, Math.round(n)));
+    const r = clamp(mix(c.r));
+    const g = clamp(mix(c.g));
+    const b = clamp(mix(c.b));
+    if (c.a != null) {
+      return "rgba(" + r + ", " + g + ", " + b + ", " + c.a + ")";
+    }
+    return rgbToHex(r, g, b);
+  }
+
   /** Convenience: everything needed to render one badge. */
   function describe(author, settings, domainColors) {
     const { name, email } = parseSender(author);
@@ -266,6 +323,7 @@
     getColor,
     pickForeground,
     normalizeHex,
+    adjustBrightness,
     hslToHex,
     describe
   };

@@ -820,6 +820,11 @@
       bg = Core.normalizeHex(settings.listBackgroundColor) || "#ffffff";
       fg = Core.normalizeHex(settings.listTextColor) || "#000000";
     }
+    // Optional lighten/darken of the background (both modes) so the list can be set
+    // apart from the folder pane it may be matching. 0 leaves the colour untouched.
+    if (bg) {
+      bg = Core.adjustBrightness(bg, settings.listBrightness);
+    }
     if (bg) {
       rootStyle.setProperty("--ti-list-bg", bg);
     } else {

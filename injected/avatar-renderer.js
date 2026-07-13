@@ -690,7 +690,9 @@
     "--ti-unread-fill-wash",
     "--ti-unread-subject-color",
     "--ti-list-bg",
-    "--ti-list-fg"
+    "--ti-list-fg",
+    "--ti-list-sel-bg",
+    "--ti-list-sel-fg"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -940,6 +942,23 @@
       ensureSchemeListener();
     }
 
+    // Selected-message colour override (both layouts). Independent of the list
+    // background/text toggle above, but gated on the same master `enabled`. Two
+    // root vars + the data-ti-list-selection gate; the CSS repaints .selected rows.
+    rootStyle.setProperty(
+      "--ti-list-sel-bg",
+      Core.normalizeHex(settings.listSelectionColor) || "#3574f0"
+    );
+    rootStyle.setProperty(
+      "--ti-list-sel-fg",
+      Core.normalizeHex(settings.listSelectionTextColor) || "#ffffff"
+    );
+    if (settings.enabled !== false && settings.listSelectionEnabled === true) {
+      doc.documentElement.dataset.tiListSelection = "on";
+    } else {
+      delete doc.documentElement.dataset.tiListSelection;
+    }
+
     // Force a full recompute: color mode / initials may have changed.
     rowKeys = new WeakMap();
     enabled = settings.enabled !== false;
@@ -994,6 +1013,7 @@
         delete doc.documentElement.dataset.tiFillMode;
         delete doc.documentElement.dataset.tiUnreadSubject;
         delete doc.documentElement.dataset.tiListColor;
+        delete doc.documentElement.dataset.tiListSelection;
         if (schemeMql) {
           try {
             schemeMql.removeEventListener("change", onSchemeChange);

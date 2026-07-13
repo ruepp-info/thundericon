@@ -344,3 +344,30 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
 :root[data-ti-list-color] tr[is="thread-card"]:not(.selected) {
   color: var(--ti-list-fg);
 }
+
+/* Selected-message colour override — BOTH layouts.
+ *
+ * With a custom list background, Thunderbird's own selection highlight can be hard
+ * to tell apart, so this repaints the selected row with a chosen background + text
+ * colour. Independent of the background/text feature above (own gate,
+ * data-ti-list-selection), so it can be used on its own. Mirrors the background
+ * structure above — Table selection on the <tr>, Cards selection on the card <td>
+ * — and sets the text colour on the row so it inherits down to sender/subject.
+ *
+ * Thunderbird may paint the selected surface on the CELL (like the card default
+ * background above) or on the row, so we paint BOTH the <td> and the <tr> — belt
+ * and braces, so it covers whichever layout uses. Text colour goes on the row so it
+ * inherits down to sender/subject.
+ *
+ * Internal Thunderbird DOM (the .selected row class), not stable WebExtension API;
+ * verify on major TB updates (add !important only if a live check shows TB
+ * !important-ing its selection colours). */
+:root[data-ti-list-selection] tr[is="thread-row"].selected > td,
+:root[data-ti-list-selection] tr[is="thread-card"].selected > td {
+  background-color: var(--ti-list-sel-bg);
+}
+:root[data-ti-list-selection] tr[is="thread-row"].selected,
+:root[data-ti-list-selection] tr[is="thread-card"].selected {
+  background-color: var(--ti-list-sel-bg);
+  color: var(--ti-list-sel-fg);
+}

@@ -656,6 +656,40 @@ test("destroy() clears the list-colour gate and vars", async () => {
   assert.equal(doc.documentElement.style.getPropertyValue("--ti-list-fg"), "");
 });
 
+test("selected-message colour sets --ti-list-sel vars + gate, off by default", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListSelection, undefined);
+
+  cfg.settings.listSelectionEnabled = true;
+  cfg.settings.listSelectionColor = "#334455";
+  cfg.settings.listSelectionTextColor = "#fafbfc";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  const rootStyle = doc.documentElement.style;
+  assert.equal(doc.documentElement.dataset.tiListSelection, "on");
+  assert.equal(rootStyle.getPropertyValue("--ti-list-sel-bg"), "#334455");
+  assert.equal(rootStyle.getPropertyValue("--ti-list-sel-fg"), "#fafbfc");
+
+  // Independent of the background/text feature; follows the master switch.
+  cfg.settings.enabled = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListSelection, undefined);
+});
+
+test("destroy() clears the selected-message gate", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.listSelectionEnabled = true;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListSelection, "on");
+
+  window.__thundericon.destroy();
+  assert.equal(doc.documentElement.dataset.tiListSelection, undefined);
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-list-sel-bg"), "");
+});
+
 /* ---- BIMI logo branch ------------------------------------------------- */
 
 function bimiConfig() {

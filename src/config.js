@@ -75,6 +75,14 @@
       listBackgroundColor: "#ffffff",
       listTextColor: "#000000",
 
+      // Selected-message colour override (both layouts). Independent of the two
+      // colours above (someone may want only a custom selection colour) — useful
+      // when a custom list background makes Thunderbird's own selection highlight
+      // hard to see. Opt-in.
+      listSelectionEnabled: false,
+      listSelectionColor: "#3574f0",
+      listSelectionTextColor: "#ffffff",
+
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so
       // it's on by default. Handled by the privileged experiment (about:message).

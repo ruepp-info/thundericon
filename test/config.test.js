@@ -130,6 +130,28 @@ test("message-list colour defaults exist and survive a partial stored settings",
   assert.equal(m2.settings.listTextColor, "#eeeeee");
 });
 
+test("selected-message colour defaults exist and survive a partial stored settings", () => {
+  const s = Cfg.DEFAULTS.settings;
+  assert.equal(s.listSelectionEnabled, false); // opt-in: off by default
+  assert.equal(s.listSelectionColor, "#3574f0");
+  assert.equal(s.listSelectionTextColor, "#ffffff");
+  // A profile saved before this feature existed must still surface the defaults.
+  const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
+  assert.equal(m.settings.listSelectionEnabled, false);
+  assert.equal(m.settings.listSelectionColor, "#3574f0");
+  // an explicit override still wins
+  const m2 = Cfg.mergeSettings({
+    settings: {
+      listSelectionEnabled: true,
+      listSelectionColor: "#334455",
+      listSelectionTextColor: "#fafbfc"
+    }
+  });
+  assert.equal(m2.settings.listSelectionEnabled, true);
+  assert.equal(m2.settings.listSelectionColor, "#334455");
+  assert.equal(m2.settings.listSelectionTextColor, "#fafbfc");
+});
+
 test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {
   const s = Cfg.DEFAULTS.settings;
   assert.equal(s.colorMode, "hslHash");

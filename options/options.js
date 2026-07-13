@@ -184,6 +184,9 @@ function populate() {
   $("listColorMode").value = s.listColorMode || "fixed";
   $("listBackgroundColor").value = Core.normalizeHex(s.listBackgroundColor) || "#ffffff";
   $("listTextColor").value = Core.normalizeHex(s.listTextColor) || "#000000";
+  $("listSelectionEnabled").checked = s.listSelectionEnabled === true;
+  $("listSelectionColor").value = Core.normalizeHex(s.listSelectionColor) || "#3574f0";
+  $("listSelectionTextColor").value = Core.normalizeHex(s.listSelectionTextColor) || "#ffffff";
 
   $("unreadEmphasis").checked = s.unreadEmphasis !== false;
   $("unreadStyle").value = s.unreadStyle || "rowTint";
@@ -232,6 +235,7 @@ function wire() {
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor",
     "listColorEnabled", "listColorMode", "listBackgroundColor", "listTextColor",
+    "listSelectionEnabled", "listSelectionColor", "listSelectionTextColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
     "unreadFillMode", "unreadFillColor", "unreadRowStrength",
@@ -367,6 +371,9 @@ function collectScalars() {
   s.listColorMode = $("listColorMode").value;
   s.listBackgroundColor = $("listBackgroundColor").value;
   s.listTextColor = $("listTextColor").value;
+  s.listSelectionEnabled = $("listSelectionEnabled").checked;
+  s.listSelectionColor = $("listSelectionColor").value;
+  s.listSelectionTextColor = $("listSelectionTextColor").value;
   s.unreadEmphasis = $("unreadEmphasis").checked;
   s.unreadStyle = $("unreadStyle").value;
   s.unreadAccentColor = $("unreadAccentColor").value;
@@ -582,6 +589,13 @@ function updateListColorState() {
   $("listTextColor").disabled = !on || !fixed;
   $("listColorGroup").classList.toggle("disabled", !on);
   $("listFixedGroup").hidden = !fixed;
+
+  // The selected-message color is its own independent switch (only its two color
+  // pickers depend on it), so it isn't gated on the list background/text toggle.
+  const selOn = $("listSelectionEnabled").checked;
+  $("listSelectionColor").disabled = !selOn;
+  $("listSelectionTextColor").disabled = !selOn;
+  $("listSelectionGroup").classList.toggle("disabled", !selOn);
 }
 
 // The style select and accent color only matter when unread emphasis is on. The

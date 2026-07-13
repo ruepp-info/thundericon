@@ -185,6 +185,31 @@
           </p>
         </div>
       </section>
+
+      <section class="card span2">
+        <h2>Selected message color</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="listSelectionEnabled" />
+          <span>Custom color for the selected message</span>
+        </label>
+        <p class="hint">
+          Replaces Thunderbird's own highlight on the selected row — handy when a
+          custom list background makes the default selection hard to see. Works in
+          <strong>both</strong> layouts and can be used on its own, without the
+          background/text colors above.
+        </p>
+
+        <div class="subgroup" id="listSelectionGroup">
+          <div class="row stack">
+            <span>Selection background</span>
+            <input type="color" id="listSelectionColor" />
+          </div>
+          <div class="row stack">
+            <span>Selection text</span>
+            <input type="color" id="listSelectionTextColor" />
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- Unread emphasis (Cards layout) -->

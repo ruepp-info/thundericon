@@ -105,6 +105,31 @@ test("unread subject color defaults exist and survive a partial stored settings"
   assert.equal(m2.settings.unreadSubjectColor, "#ff8800");
 });
 
+test("message-list colour defaults exist and survive a partial stored settings", () => {
+  const s = Cfg.DEFAULTS.settings;
+  assert.equal(s.listColorEnabled, false); // opt-in: off by default
+  assert.equal(s.listColorMode, "fixed");
+  assert.equal(s.listBackgroundColor, "#ffffff");
+  assert.equal(s.listTextColor, "#000000");
+  // A profile saved before this feature existed must still surface the defaults.
+  const m = Cfg.mergeSettings({ settings: { badgeSize: 40 } });
+  assert.equal(m.settings.listColorEnabled, false);
+  assert.equal(m.settings.listColorMode, "fixed");
+  // an explicit override still wins
+  const m2 = Cfg.mergeSettings({
+    settings: {
+      listColorEnabled: true,
+      listColorMode: "folderPane",
+      listBackgroundColor: "#101010",
+      listTextColor: "#eeeeee"
+    }
+  });
+  assert.equal(m2.settings.listColorEnabled, true);
+  assert.equal(m2.settings.listColorMode, "folderPane");
+  assert.equal(m2.settings.listBackgroundColor, "#101010");
+  assert.equal(m2.settings.listTextColor, "#eeeeee");
+});
+
 test("tuned defaults: vibrant color mode, and Junk/Trash not skipped", () => {
   const s = Cfg.DEFAULTS.settings;
   assert.equal(s.colorMode, "hslHash");

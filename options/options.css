@@ -270,6 +270,19 @@ output {
   color: var(--ti-unread-subject-color, #4aa9ff);
 }
 
+/* Preview mirrors the message-list background/text colors (fixed mode only —
+   applyRootVars sets the vars + data-ti-list-color for that case). The real list
+   rules in avatars.css target the thread tree, which the preview <ul> isn't, so we
+   reflect them here on the preview container / sample rows instead. */
+:root[data-ti-list-color] .preview {
+  background-color: var(--ti-list-bg);
+  border-radius: 8px;
+  padding: 8px;
+}
+:root[data-ti-list-color] .preview li {
+  color: var(--ti-list-fg);
+}
+
 /* Preview mirrors the Cards-view unread emphasis so its effect is visible here.
    applyRootVars() sets --ti-unread-accent + data-ti-unread-style on :root and
    renderPreview() tags alternating samples .ti-avatar--unread / --read (the same

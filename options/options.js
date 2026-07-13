@@ -180,6 +180,11 @@ function populate() {
   $("colorMode").value = s.colorMode;
   $("fixedColor").value = Core.normalizeHex(s.fixedColor) || "#6b7280";
 
+  $("listColorEnabled").checked = s.listColorEnabled === true;
+  $("listColorMode").value = s.listColorMode || "fixed";
+  $("listBackgroundColor").value = Core.normalizeHex(s.listBackgroundColor) || "#ffffff";
+  $("listTextColor").value = Core.normalizeHex(s.listTextColor) || "#000000";
+
   $("unreadEmphasis").checked = s.unreadEmphasis !== false;
   $("unreadStyle").value = s.unreadStyle || "rowTint";
   $("unreadAccentColor").value = Core.normalizeHex(s.unreadAccentColor) || "#4aa9ff";
@@ -226,6 +231,7 @@ function wire() {
     "enabled", "layoutTable", "layoutCards", "badgeSize", "borderRadius",
     "fontFamily", "fontWeight", "initialsCount", "initialsSource",
     "uppercase", "colorMode", "fixedColor",
+    "listColorEnabled", "listColorMode", "listBackgroundColor", "listTextColor",
     "unreadEmphasis", "unreadStyle", "unreadAccentColor", "unreadBarWidth",
     "unreadGlyph", "unreadGlyphFont", "unreadGlyphSize", "unreadGlyphBold",
     "unreadFillMode", "unreadFillColor", "unreadRowStrength",
@@ -357,6 +363,10 @@ function collectScalars() {
   s.uppercase = $("uppercase").checked;
   s.colorMode = $("colorMode").value;
   s.fixedColor = $("fixedColor").value;
+  s.listColorEnabled = $("listColorEnabled").checked;
+  s.listColorMode = $("listColorMode").value;
+  s.listBackgroundColor = $("listBackgroundColor").value;
+  s.listTextColor = $("listTextColor").value;
   s.unreadEmphasis = $("unreadEmphasis").checked;
   s.unreadStyle = $("unreadStyle").value;
   s.unreadAccentColor = $("unreadAccentColor").value;
@@ -552,12 +562,26 @@ function sideEffects() {
   $("paletteGroup").hidden = state.settings.colorMode !== "customPalette";
 
   updateEnabledState();
+  updateListColorState();
   updateUnreadState();
   updateUnreadSubjectState();
   updateBimiState();
   updateGravatarState();
   applyRootVars();
   renderPreview();
+}
+
+// The message-list color controls only matter when the feature is on; the two
+// color pickers only apply in "fixed" mode ("Match folder pane" reads colors live
+// from the folder tree, so there's nothing to pick).
+function updateListColorState() {
+  const on = $("listColorEnabled").checked;
+  const fixed = $("listColorMode").value === "fixed";
+  $("listColorMode").disabled = !on;
+  $("listBackgroundColor").disabled = !on || !fixed;
+  $("listTextColor").disabled = !on || !fixed;
+  $("listColorGroup").classList.toggle("disabled", !on);
+  $("listFixedGroup").hidden = !fixed;
 }
 
 // The style select and accent color only matter when unread emphasis is on. The
@@ -682,6 +706,17 @@ function applyRootVars() {
     document.documentElement.dataset.tiUnreadSubject = "on";
   } else {
     delete document.documentElement.dataset.tiUnreadSubject;
+  }
+
+  // Preview the message-list colors — FIXED mode only. The options page has no
+  // folder pane to sample, so "Match folder pane" can't be previewed here; it
+  // takes effect live in the real message list. Mirrors the renderer's gate.
+  if (s.listColorEnabled === true && s.listColorMode !== "folderPane") {
+    root.setProperty("--ti-list-bg", Core.normalizeHex(s.listBackgroundColor) || "#ffffff");
+    root.setProperty("--ti-list-fg", Core.normalizeHex(s.listTextColor) || "#000000");
+    document.documentElement.dataset.tiListColor = "on";
+  } else {
+    delete document.documentElement.dataset.tiListColor;
   }
 }
 

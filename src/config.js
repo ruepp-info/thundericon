@@ -65,6 +65,16 @@
       unreadSubjectColorEnabled: false,
       unreadSubjectColor: "#4aa9ff",
 
+      // Message-list background & text color (both layouts). Off by default.
+      // `listColorMode` = "fixed" (the two colors below) or "folderPane" (copy the
+      // folder/account tree's live colors — the renderer reads them via
+      // getComputedStyle, so they follow the active Thunderbird theme). Selected/
+      // hovered rows keep Thunderbird's own highlight, so only normal rows recolor.
+      listColorEnabled: false,
+      listColorMode: "fixed", // fixed | folderPane
+      listBackgroundColor: "#ffffff",
+      listTextColor: "#000000",
+
       // Auto-expand the attachment list in the message reader so attachments are
       // visible without clicking to expand. Pure local UI tweak (no network), so
       // it's on by default. Handled by the privileged experiment (about:message).

@@ -299,3 +299,48 @@ tr[is="thread-card"] td:has(> .ti-avatar--card) > :not(.ti-avatar) {
   td.subjectcol-column .subject-line > span {
   color: var(--ti-unread-subject-color, #4aa9ff);
 }
+
+/* Message-list background & text colour — BOTH layouts.
+ *
+ * A user-chosen (fixed) or folder-pane-derived colour washed over the whole
+ * message list. Orthogonal to every unread cue: it gates on its own root
+ * attribute data-ti-list-color and reads --ti-list-bg / --ti-list-fg. The renderer
+ * resolves BOTH modes ("fixed" and "match folder pane") down to those two vars, so
+ * the CSS needs no mode branch.
+ *
+ * Selection & hover are LEFT TO THUNDERBIRD: the background rules exclude
+ * .selected and :hover so TB paints its own highlight there (readable contrast) —
+ * mirroring the unread-subject rule's .selected exclusion. The text rule excludes
+ * only .selected (TB paints its own contrast text on the selection background;
+ * hover keeps our text colour). The container (#threadTree / the tbody) also takes
+ * the background, so the empty area below the last row is filled and any opaque
+ * default / alternating-row background is covered.
+ *
+ * Like the unread rules this targets internal Thunderbird DOM (the thread tree /
+ * rows) and wins as a later AUTHOR sheet without !important; verify on major TB
+ * updates (add !important only if a live check shows TB !important-ing these). */
+:root[data-ti-list-color] #threadTree,
+:root[data-ti-list-color] tbody[is="tree-view-table-body"] {
+  background-color: var(--ti-list-bg);
+}
+
+/* Table rows: the <tr> carries the background (the cells are transparent, so the
+ * row colour shows through them). */
+:root[data-ti-list-color] tr[is="thread-row"]:not(.selected):not(:hover) {
+  background-color: var(--ti-list-bg);
+}
+
+/* Cards rows: Thunderbird paints the opaque row surface on the card CELL — the
+ * same <td> the "rowTint" unread style tints — which sits ON TOP OF the <tr>, so a
+ * tr-level background is hidden behind it (that's why the empty-folder page colour
+ * shows but a populated Cards list did not). Paint the cell instead; the inner
+ * .card-container is transparent, so it shows through. The unread rowTint rule is
+ * more specific (td:has(> .ti-avatar--unread)), so it still wins where it applies. */
+:root[data-ti-list-color] tr[is="thread-card"]:not(.selected):not(:hover) > td {
+  background-color: var(--ti-list-bg);
+}
+
+:root[data-ti-list-color] tr[is="thread-row"]:not(.selected),
+:root[data-ti-list-color] tr[is="thread-card"]:not(.selected) {
+  color: var(--ti-list-fg);
+}

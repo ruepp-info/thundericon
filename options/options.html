@@ -24,6 +24,8 @@
     <nav class="tabs" role="tablist" aria-label="Settings sections">
       <button type="button" class="tab" role="tab" id="tab-general"
               aria-controls="panel-general" aria-selected="true">General</button>
+      <button type="button" class="tab" role="tab" id="tab-listcolors"
+              aria-controls="panel-listcolors" aria-selected="false" tabindex="-1">List colors</button>
       <button type="button" class="tab" role="tab" id="tab-unread"
               aria-controls="panel-unread" aria-selected="false" tabindex="-1">Unread</button>
       <button type="button" class="tab" role="tab" id="tab-attachments"
@@ -140,6 +142,48 @@
         <p class="hint">Force a specific color for senders from a given domain (overrides the mode above).</p>
         <div id="domainList" class="domains"></div>
         <button type="button" id="addDomain" class="ghost">+ Add mapping</button>
+      </section>
+    </div>
+
+    <!-- Message list colors (both views) -->
+    <div class="grid panel" id="panel-listcolors" role="tabpanel" aria-labelledby="tab-listcolors" hidden>
+      <section class="card span2">
+        <h2>Message list colors (both views)</h2>
+        <label class="row switch main">
+          <input type="checkbox" id="listColorEnabled" />
+          <span>Custom background &amp; text color for the message list</span>
+        </label>
+        <p class="hint">
+          Recolors the whole message list — background and text — in
+          <strong>both</strong> the Cards and Table layouts. Selected and hovered
+          rows keep Thunderbird's own highlight colors, so they stay readable.
+        </p>
+
+        <div class="subgroup" id="listColorGroup">
+          <label class="row">
+            <span>Color source</span>
+            <select id="listColorMode">
+              <option value="fixed">Fixed colors</option>
+              <option value="folderPane">Match folder pane</option>
+            </select>
+          </label>
+          <div class="conditional" id="listFixedGroup">
+            <div class="row stack">
+              <span>Background color</span>
+              <input type="color" id="listBackgroundColor" />
+            </div>
+            <div class="row stack">
+              <span>Text color</span>
+              <input type="color" id="listTextColor" />
+            </div>
+          </div>
+          <p class="hint">
+            <em>Match folder pane</em> copies the current colors of the folder /
+            account tree on the left and refreshes when you switch between light and
+            dark mode. (Not shown in the preview above — it takes effect live in the
+            message list.)
+          </p>
+        </div>
       </section>
     </div>
 

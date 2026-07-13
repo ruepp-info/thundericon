@@ -49,6 +49,14 @@
   let enabled = true; // gates all decoration; flipped by config
   let unreadOn = false; // unread-emphasis feature (Cards layout); set by config
 
+  // Message-list background/text colour feature. Resolved to two root CSS vars
+  // (--ti-list-bg / --ti-list-fg) + the data-ti-list-color gate. In "folderPane"
+  // mode the colours are read live from the folder tree (see deriveFolderPaneColors),
+  // so they follow the active theme; a scheme-change listener re-derives them.
+  let listColorOn = false;
+  let listColorMode = "fixed"; // fixed | folderPane
+  let schemeMql = null; // prefers-color-scheme MediaQueryList (folderPane refresh)
+
   // BIMI: resolution is async and gated per-message by DMARC (a domain may have a
   // logo, yet a spoofed message from it must still show initials). So results are
   // cached by message-id, NOT by domain. Values: string data URL (show logo) or
@@ -680,7 +688,9 @@
     "--ti-unread-fill",
     "--ti-unread-fill-fg",
     "--ti-unread-fill-wash",
-    "--ti-unread-subject-color"
+    "--ti-unread-subject-color",
+    "--ti-list-bg",
+    "--ti-list-fg"
   ];
 
   // unreadStyle -> the space-separated tokens the CSS matches with [~="…"].
@@ -718,6 +728,127 @@
     const p = Number(pct);
     const frac = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) / 100 : 0.5;
     return h + Math.round(frac * 255).toString(16).padStart(2, "0");
+  }
+
+  /* ---- message-list colour (both layouts) ------------------------------ */
+
+  // A CSS colour string is "opaque enough" to use as a background if it's set and
+  // not transparent / fully-transparent rgba. Empty (unresolved) counts as not.
+  function isOpaqueColor(c) {
+    if (!c) {
+      return false;
+    }
+    const s = String(c).trim().toLowerCase();
+    if (s === "" || s === "transparent") {
+      return false;
+    }
+    const m = s.match(/^rgba?\(([^)]+)\)$/);
+    if (m) {
+      const parts = m[1].split(/[,\s/]+/).filter(Boolean);
+      if (parts.length >= 4 && parseFloat(parts[3]) === 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Read the folder pane's resolved colours so the message list can match them.
+  // The folder pane lives in the SAME about:3pane document as this renderer, so a
+  // plain getComputedStyle reaches it. The tree's own <ul> is usually transparent
+  // (the background sits on a container), so we walk ancestors for the first opaque
+  // background; the text colour is read straight off the tree. All internal TB DOM
+  // (#folderTree / #folderPane) — not stable WebExtension API; verify on major TB
+  // updates. Returns { bg, fg } (either may be null) or null if the pane is absent.
+  function deriveFolderPaneColors() {
+    try {
+      const ft =
+        doc.getElementById("folderTree") ||
+        doc.querySelector('[is="folder-tree"], #folderPane');
+      if (!ft) {
+        return null;
+      }
+      const fg = win.getComputedStyle(ft).color || "";
+      let bg = "";
+      for (let el = ft; el; el = el.parentElement) {
+        const c = win.getComputedStyle(el).backgroundColor;
+        if (isOpaqueColor(c)) {
+          bg = c;
+          break;
+        }
+      }
+      if (!bg && doc.body) {
+        const bodyBg = win.getComputedStyle(doc.body).backgroundColor;
+        if (isOpaqueColor(bodyBg)) {
+          bg = bodyBg;
+        }
+      }
+      if (!isOpaqueColor(bg) && !fg) {
+        return null;
+      }
+      return { bg: isOpaqueColor(bg) ? bg : null, fg: fg || null };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Resolve the current mode to --ti-list-bg / --ti-list-fg + the gate attribute.
+  // Gated on the master `enabled` switch (folded into listColorOn) like the unread
+  // subject colour: the CSS keys off Thunderbird's own rows, not our badges, so
+  // removeAllBadges() alone wouldn't stop it.
+  function applyListColor() {
+    const rootStyle = doc.documentElement.style;
+    if (!listColorOn) {
+      delete doc.documentElement.dataset.tiListColor;
+      return;
+    }
+    let bg;
+    let fg;
+    if (listColorMode === "folderPane") {
+      const derived = deriveFolderPaneColors();
+      if (!derived || (!derived.bg && !derived.fg)) {
+        // Pane not resolvable yet (about:3pane still loading) or DOM changed.
+        // Don't paint with meaningless fallbacks — a later config push or scheme
+        // change re-derives.
+        delete doc.documentElement.dataset.tiListColor;
+        return;
+      }
+      bg = derived.bg;
+      fg = derived.fg;
+    } else {
+      bg = Core.normalizeHex(settings.listBackgroundColor) || "#ffffff";
+      fg = Core.normalizeHex(settings.listTextColor) || "#000000";
+    }
+    if (bg) {
+      rootStyle.setProperty("--ti-list-bg", bg);
+    } else {
+      rootStyle.removeProperty("--ti-list-bg");
+    }
+    if (fg) {
+      rootStyle.setProperty("--ti-list-fg", fg);
+    } else {
+      rootStyle.removeProperty("--ti-list-fg");
+    }
+    doc.documentElement.dataset.tiListColor = "on";
+  }
+
+  // Re-derive folder-pane colours when the OS light/dark scheme flips (the tree's
+  // colours change with it). Registered once; matchMedia may be absent under the
+  // jsdom test harness, so guard. Removed in destroy().
+  function onSchemeChange() {
+    if (listColorOn && listColorMode === "folderPane") {
+      applyListColor();
+    }
+  }
+  function ensureSchemeListener() {
+    if (schemeMql || typeof win.matchMedia !== "function") {
+      return;
+    }
+    try {
+      schemeMql = win.matchMedia("(prefers-color-scheme: dark)");
+      schemeMql.addEventListener("change", onSchemeChange);
+    } catch (e) {
+      schemeMql = null;
+    }
   }
 
   function applyConfig(cfg) {
@@ -799,6 +930,16 @@
       delete doc.documentElement.dataset.tiUnreadSubject;
     }
 
+    // Message-list background/text colour (both layouts). Resolve the current mode
+    // to the two root vars + gate; in folderPane mode also keep the scheme listener
+    // so an OS light/dark flip re-derives the folder-pane colours.
+    listColorOn = settings.enabled !== false && settings.listColorEnabled === true;
+    listColorMode = settings.listColorMode === "folderPane" ? "folderPane" : "fixed";
+    applyListColor();
+    if (listColorOn && listColorMode === "folderPane") {
+      ensureSchemeListener();
+    }
+
     // Force a full recompute: color mode / initials may have changed.
     rowKeys = new WeakMap();
     enabled = settings.enabled !== false;
@@ -852,6 +993,15 @@
         delete doc.documentElement.dataset.tiUnreadStyle;
         delete doc.documentElement.dataset.tiFillMode;
         delete doc.documentElement.dataset.tiUnreadSubject;
+        delete doc.documentElement.dataset.tiListColor;
+        if (schemeMql) {
+          try {
+            schemeMql.removeEventListener("change", onSchemeChange);
+          } catch (e) {
+            /* best effort */
+          }
+          schemeMql = null;
+        }
         rowKeys = new WeakMap();
         pending = new Set();
         bimiByMsg = new Map();

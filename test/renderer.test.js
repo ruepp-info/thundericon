@@ -565,6 +565,97 @@ test("destroy() clears the unread subject gate and color", async () => {
   );
 });
 
+/* ---- message-list colour (both layouts) ------------------------------- */
+
+// Like the subject colour, all the renderer owns is two root vars + the gate; the
+// CSS keys off Thunderbird's own tree/rows.
+
+test("list colour: fixed mode sets --ti-list-bg/-fg + the gate, off by default", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+  // DEFAULT_CONFIG omits the key -> opt-in, so the gate must stay absent.
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListColor, undefined);
+
+  cfg.settings.listColorEnabled = true;
+  cfg.settings.listColorMode = "fixed";
+  cfg.settings.listBackgroundColor = "#112233";
+  cfg.settings.listTextColor = "#ffeecc";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  const rootStyle = doc.documentElement.style;
+  assert.equal(doc.documentElement.dataset.tiListColor, "on");
+  assert.equal(rootStyle.getPropertyValue("--ti-list-bg"), "#112233");
+  assert.equal(rootStyle.getPropertyValue("--ti-list-fg"), "#ffeecc");
+
+  cfg.settings.listColorEnabled = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListColor, undefined);
+});
+
+test("list colour follows the master switch", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.listColorEnabled = true;
+  cfg.settings.listColorMode = "fixed";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListColor, "on");
+
+  // "Show avatars" off must take it down too (it keys off TB's rows, not a badge).
+  cfg.settings.enabled = false;
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListColor, undefined);
+});
+
+test("list colour: folderPane mode derives colours from the folder tree", async () => {
+  const { window, doc } = setup();
+  // Build a folder pane in the same document, as about:3pane has: the tree's own
+  // <ul> is transparent, the background sits on the pane container (exercises the
+  // ancestor walk); the text colour is read straight off the tree.
+  const pane = doc.createElement("div");
+  pane.id = "folderPane";
+  pane.style.backgroundColor = "rgb(240, 245, 250)";
+  const ft = doc.createElement("ul");
+  ft.id = "folderTree";
+  ft.style.color = "rgb(30, 40, 50)";
+  pane.appendChild(ft);
+  doc.body.appendChild(pane);
+
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.listColorEnabled = true;
+  cfg.settings.listColorMode = "folderPane";
+  window.__thundericon.apply(JSON.stringify(cfg));
+
+  const rootStyle = doc.documentElement.style;
+  assert.equal(doc.documentElement.dataset.tiListColor, "on");
+  assert.equal(rootStyle.getPropertyValue("--ti-list-fg"), "rgb(30, 40, 50)");
+  assert.equal(rootStyle.getPropertyValue("--ti-list-bg"), "rgb(240, 245, 250)");
+});
+
+test("list colour: folderPane mode with no folder pane leaves the list untinted", async () => {
+  const { window, doc } = setup(); // setup() builds no folder pane
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.listColorEnabled = true;
+  cfg.settings.listColorMode = "folderPane";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListColor, undefined);
+});
+
+test("destroy() clears the list-colour gate and vars", async () => {
+  const { window, doc } = setup();
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cfg.settings.listColorEnabled = true;
+  cfg.settings.listColorMode = "fixed";
+  cfg.settings.listBackgroundColor = "#112233";
+  window.__thundericon.apply(JSON.stringify(cfg));
+  assert.equal(doc.documentElement.dataset.tiListColor, "on");
+
+  window.__thundericon.destroy();
+  assert.equal(doc.documentElement.dataset.tiListColor, undefined);
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-list-bg"), "");
+  assert.equal(doc.documentElement.style.getPropertyValue("--ti-list-fg"), "");
+});
+
 /* ---- BIMI logo branch ------------------------------------------------- */
 
 function bimiConfig() {

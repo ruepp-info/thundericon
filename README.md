@@ -73,10 +73,12 @@ tree, in both **Table** and **Cards** layouts, without blocking the main thread.
 > The message list lives in the privileged `about:3pane` document, which ordinary
 > WebExtension content scripts cannot touch — hence the small experiment bridge.
 > It uses internal globals (`gDBView`, thread-tree DOM) that are not stable
-> WebExtension API, so the add-on declares a Thunderbird version range
-> (`strict_min_version` 128.0; `strict_max_version` is set to the current release
-> at build time) and falls back to scraping the correspondent cell if the DB view
-> is unavailable.
+> WebExtension API, so the add-on declares a Thunderbird floor
+> (`strict_min_version` 128.0) and falls back to scraping the correspondent cell if
+> the DB view is unavailable. `strict_max_version` is intentionally left open
+> (`999.*`): Thunderbird disables an add-on whose cap is below the running version,
+> so a cap that tracked the current release would have every monthly Thunderbird
+> upgrade turn the add-on off.
 
 ## Build
 
@@ -94,8 +96,8 @@ installable archive:
 file, so it never emits a broken add-on. Lower-level helpers remain available:
 `python3 tools/package.py` (validate + zip) and `python3 tools/make-icons.py`.
 
-Tagged releases are built and attached to GitHub Releases automatically (version
-and `strict_max_version` are injected at build time) — see [`RELEASE.md`](RELEASE.md).
+Tagged releases are built and attached to GitHub Releases automatically (the
+version is injected at build time from the tag) — see [`RELEASE.md`](RELEASE.md).
 
 ## Install
 

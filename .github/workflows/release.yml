@@ -44,24 +44,25 @@ jobs:
           tmp=$(mktemp); jq --arg v "$V" '.version=$v' manifest.json > "$tmp" && mv "$tmp" manifest.json
           tmp=$(mktemp); jq --arg v "$V" '.version=$v' package.json  > "$tmp" && mv "$tmp" package.json
 
-      # Experiment add-ons must pin strict_max_version. Derive it from the current
-      # Thunderbird release (Mozilla's machine-readable product-details feed) so it
-      # tracks the latest version instead of going stale. Falls back to the
-      # committed value if the feed is unreachable.
-      - name: Set strict_max_version to the latest Thunderbird
+      # strict_max_version is NOT rewritten here. It used to be pinned to the
+      # Thunderbird release of the build day, which meant the *next* monthly
+      # Thunderbird silently disabled the add-on as "incompatible" — Gecko applies
+      # strict compatibility to every WebExtension, so a cap below the running app
+      # version disables it outright. The committed cap is deliberately far in the
+      # future instead, so a release keeps working across Thunderbird upgrades.
+      # This step only reports where the committed cap sits relative to the current
+      # Thunderbird, and never fails the build (the feed may be unreachable).
+      - name: Check strict_max_version against the current Thunderbird
         run: |
+          MAXV=$(jq -r '.browser_specific_settings.gecko.strict_max_version // empty' manifest.json)
           LATEST=$(curl -fsSL --max-time 20 \
             https://product-details.mozilla.org/1.0/thunderbird_versions.json \
-            | jq -r '.LATEST_THUNDERBIRD_VERSION // empty')
-          MAJOR="${LATEST%%.*}"
-          if [[ "$MAJOR" =~ ^[0-9]+$ ]]; then
-            MAXV="${MAJOR}.*"
-            echo "Latest Thunderbird is $LATEST -> strict_max_version = $MAXV"
-            tmp=$(mktemp)
-            jq --arg m "$MAXV" '.browser_specific_settings.gecko.strict_max_version = $m' \
-              manifest.json > "$tmp" && mv "$tmp" manifest.json
-          else
-            echo "::warning::Could not read latest Thunderbird version (got '$LATEST'); keeping committed strict_max_version"
+            | jq -r '.LATEST_THUNDERBIRD_VERSION // empty') || true
+          echo "Committed strict_max_version: ${MAXV:-(unset -> no maximum)}"
+          echo "Latest Thunderbird release:   ${LATEST:-(unknown)}"
+          CAP="${MAXV%%.*}"; NOW="${LATEST%%.*}"
+          if [[ "$CAP" =~ ^[0-9]+$ && "$NOW" =~ ^[0-9]+$ && "$CAP" -lt "$NOW" ]]; then
+            echo "::warning::strict_max_version ($MAXV) is below the current Thunderbird ($LATEST); Thunderbird will disable this build as incompatible."
           fi
 
       - name: Package

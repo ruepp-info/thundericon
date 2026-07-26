@@ -33,14 +33,18 @@ Wait ~1 minute, then `thundericon-1.2.3.xpi` appears under the release's **Asset
    and pushed to GitHub.
 2. **Green CI.** `ci.yml` runs `npm ci && npm test` + manifest validation on every
    push/PR. Make sure the latest commit passed before tagging.
-3. **Thunderbird compatibility is automatic.** Because this is an Experiment
-   add-on, `manifest.json` must pin `strict_max_version`. The release workflow sets
-   it to the current Thunderbird release at build time (`<major>.*`, read from
-   Mozilla's product-details feed), so it never goes stale — you don't bump it by
-   hand. The committed value is only a fallback for local builds and if the feed is
-   unreachable. Caveat: this declares compatibility with the latest Thunderbird, so
-   ideally smoke-test on it (step 4) since an Experiment can break when internal
-   APIs change. `strict_min_version` is still set by hand.
+3. **Thunderbird compatibility needs no action.** `strict_max_version` in
+   `manifest.json` is deliberately set far in the future (`999.*`) and is **not**
+   rewritten at build time. Gecko applies strict compatibility to *every*
+   WebExtension, so a cap below the running Thunderbird disables the add-on
+   outright — pinning the cap to the release of the build day (which this pipeline
+   used to do) meant the next monthly Thunderbird silently killed every shipped
+   build. The uncapped value trades that for the opposite risk: since an Experiment
+   reaches into internals that are not stable API, a future Thunderbird can break a
+   feature rather than refuse to load. That fails soft — the badge selectors stop
+   matching, no crash — and is what step 4 is for. `strict_min_version` is set by
+   hand as before. The release workflow only *warns* if the committed cap has ended
+   up below the current Thunderbird.
 4. *(Optional)* **Smoke-test the build locally:** `./build.sh --test` produces
    `dist/thundericon-<version>.xpi` from the committed version, so you can load it
    in Thunderbird before cutting the release.
@@ -69,7 +73,9 @@ On **Release → published** it:
 
 1. Derives the version from the tag (and fails fast if it isn't semver).
 2. Runs `npm ci && npm test`.
-3. Injects the version into `manifest.json` + `package.json` (build-time only).
+3. Injects the version into `manifest.json` + `package.json` (build-time only), and
+   checks — without changing it — that `strict_max_version` is not below the current
+   Thunderbird release.
 4. Builds `dist/thundericon-<version>.xpi` via `tools/package.py`.
 5. Uploads the `.xpi` to the release with `gh release upload --clobber`.
 

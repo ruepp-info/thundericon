@@ -11,7 +11,7 @@
     "gecko": {
       "id": "thundericon@thundericon.addons",
       "strict_min_version": "128.0",
-      "strict_max_version": "152.*"
+      "strict_max_version": "999.*"
     }
   },
 

@@ -120,11 +120,19 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
       this._initialized = true;
       this._config = null;
       this._cssText = "";
-      this._coreURL = context.extension.getURL("src/avatar-core.js");
-      this._rendererURL = context.extension.getURL("injected/avatar-renderer.js");
-      this._cssURL = context.extension.getURL("injected/avatars.css");
-      this._bimiCoreURL = context.extension.getURL("src/bimi-core.js");
-      this._gravatarCoreURL = context.extension.getURL("src/gravatar-core.js");
+      // Thunderbird's internal about: pages now have a strict CSP which does
+      // not allow moz-extension: scripts. Register the packaged files as a
+      // chrome content package, which is an allowed source for privileged UI
+      // documents, and inject from there. Keep the old URLs only as a fallback
+      // for older builds where dynamic chrome registration is unavailable.
+      const assetBase = this._registerChromeAssets(context.extension)
+        ? "chrome://thundericon/content/"
+        : context.extension.getURL("");
+      this._coreURL = assetBase + "src/avatar-core.js";
+      this._rendererURL = assetBase + "injected/avatar-renderer.js";
+      this._cssURL = assetBase + "injected/avatars.css";
+      this._bimiCoreURL = assetBase + "src/bimi-core.js";
+      this._gravatarCoreURL = assetBase + "src/gravatar-core.js";
       this._listenerId = "thundericon-" + context.extension.id;
       this._mailWindows = new Set(); // messenger windows we have hooked
       this._renderers = new Set(); // about:3pane content windows we injected into
@@ -229,8 +237,54 @@ var threadPaneAvatars = class extends ExtensionCommon.ExtensionAPI {
     };
   }
 
-  onShutdown(/* isAppShutdown */) {
+  onShutdown(isAppShutdown) {
     this._teardown();
+    if (this._chromeHandle) {
+      try {
+        this._chromeHandle.destruct();
+      } catch (e) {
+        /* already unregistered / application is shutting down */
+      }
+      this._chromeHandle = null;
+    }
+    // Experiment implementation scripts are cached by Gecko. Invalidate that
+    // cache when the add-on is disabled, reloaded or updated, otherwise a newer
+    // XPI can continue running the previous implementation until Thunderbird is
+    // restarted. Avoid doing extra work during application shutdown.
+    if (!isAppShutdown) {
+      Services.obs.notifyObservers(null, "startupcache-invalidate", null);
+    }
+  }
+
+  // Register the extension root as an internal chrome:// content package. The
+  // about:3pane CSP deliberately excludes moz-extension: from script-src, so a
+  // loadSubScript() using context.extension.getURL() can be rejected even though
+  // this Experiment itself is privileged. Dynamic chrome registration is the
+  // supported bridge for packaged Experiment assets that must run in app UI.
+  _registerChromeAssets(extension) {
+    if (this._chromeHandle) {
+      return true;
+    }
+    try {
+      const aomStartup = Components.classes[
+        "@mozilla.org/addons/addon-manager-startup;1"
+      ].getService(Ci.amIAddonManagerStartup);
+      const manifestURI = Services.io.newURI(
+        "manifest.json",
+        null,
+        extension.rootURI
+      );
+      this._chromeHandle = aomStartup.registerChrome(manifestURI, [
+        ["content", "thundericon", "./"]
+      ]);
+      return true;
+    } catch (e) {
+      this._reportError(
+        "Could not register internal asset URLs; using legacy moz-extension URLs: " +
+          (e && e.message ? e.message : e)
+      );
+      return false;
+    }
   }
 
   /* ---- error plumbing --------------------------------------------------- */

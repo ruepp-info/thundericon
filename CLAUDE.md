@@ -36,6 +36,8 @@ Use **Tools → Developer Tools → Debug Add-ons → Load Temporary Add-on…**
 ### Why an Experiment API
 The message list lives in the privileged `about:3pane` document, which ordinary WebExtension content scripts cannot reach. So the add-on ships a privileged **Experiment API** (`api/threadpane/`, registered in `manifest.json` under `experiment_apis`) that runs in the parent process and is the only bridge to the list. It relies on internal Thunderbird globals (`gDBView`, the thread-tree DOM) that are **not stable WebExtension API** — the renderer falls back to scraping the correspondent cell when `gDBView` is unavailable.
 
+The Experiment registers the extension root dynamically as `chrome://thundericon/content/` before injecting packaged JS/CSS. Do not change those injection URLs back to `context.extension.getURL()` / `moz-extension://`: current `about:3pane` CSP excludes `moz-extension:` from `script-src`, so the add-on loads normally but the renderer is rejected and no UI changes appear. The dynamic chrome handle is destroyed in `onShutdown()`, which also invalidates Gecko's startup cache on add-on reload/update.
+
 ### Three execution contexts, one global-module pattern
 There is no shared module system across the contexts, so the pure modules in `src/` each publish a single global via an IIFE (`globalThis.ThundericonCore`, `ThundericonConfig`, `ThundericonBimi`, `ThundericonGravatar`) and are loaded three different ways:
 - **background page** — via `<script>` in `manifest.json` (`src/config.js`)
